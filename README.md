@@ -21,3 +21,5 @@ cd build_userana
 cmake /path/to/your/userana
 
 make
+
+./offline
