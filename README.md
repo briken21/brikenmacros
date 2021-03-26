@@ -12,7 +12,7 @@ source /path/to/installation_dir/bin/setuponline.sh
 
 *Note: to add to .bashrc: echo /path/to/installation_dir/bin/setuponline.sh >> ~/.bashrc*
 
-###  Run your useranalysis code (example: brikenmacros/useranalysis
+###  Run your useranalysis code (example: brikenmacros/useranalysis)
 
 mkdir build_userana
 
