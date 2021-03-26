@@ -15,6 +15,9 @@ source /path/to/installation_dir/bin/setuponline.sh
 ###  Run your useranalysis code (example: brikenmacros/useranalysis
 
 mkdir build_userana
+
 cd build_userana
+
 cmake /path/to/your/userana
+
 make
