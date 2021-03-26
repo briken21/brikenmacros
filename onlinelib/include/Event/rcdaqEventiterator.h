@@ -54,6 +54,9 @@ protected:
   zmq::socket_t* online;
   //zmq::context_t * ctx;
   //zmq::socket_t * online;
+#else
+  int readn (int fd, char *ptr, int nbytes);
+  int writen (int fd, char *ptr, int nbytes);
 #endif
 
   int current_index;
