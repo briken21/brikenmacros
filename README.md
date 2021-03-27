@@ -8,6 +8,8 @@ cd build_onlinelib
 
 cmake -DCMAKE_INSTALL_PREFIX=/path/to/installation_dir /path/to/brikenmacros/onlinlib
 
+*Note for offline analysis: ignore errors on Boost and zmq library*
+
 source /path/to/installation_dir/bin/setuponline.sh
 
 *Note: to add to .bashrc: echo /path/to/installation_dir/bin/setuponline.sh >> ~/.bashrc*
