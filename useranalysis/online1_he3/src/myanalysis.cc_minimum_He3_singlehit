@@ -30,7 +30,6 @@
 //#define SLOW_ONLINE 100000
 #define RATE_CAL_REFESH_SECONDS 10
 
-#define MAX_N_BOARD 20
 #define V1730_MAX_N_CH 16
 #define V1740_N_MAX_CH 64
 //! parameters for V1740
@@ -46,47 +45,180 @@ NIGIRI* data;
 TH2F* hwf2d[V1740_N_MAX_CH*10];
 TH2F* he2d;
 
-NIGIRI * treedata;
+TH1F* h1corr;
+TH1F* h2corr;
+TH1F* h3corr;
+TH1F* h4corr;
 
-int nevt = 0;
+TH2F* h2d_brikenhit;
+
+correlation* fcorr;
+//NIGIRI* data_ich;
+BrikenTreeData* belendata;
+
+
+TRandom rr;
+void genRndCircle(Double_t &x,Double_t &y,Double_t a,Double_t b,Double_t xpos,Double_t ypos,Double_t R){
+    if (b<a){
+        Double_t temp=a;
+        a=b;
+        b=temp;
+    }
+    x=xpos+b*R*TMath::Cos(2*TMath::Pi()*a/b);
+    y=ypos+b*R*TMath::Sin(2*TMath::Pi()*a/b);
+}
+
+Double_t fHe3Id2posX[140];
+Double_t fHe3Id2posY[140];
+Double_t fHe3Id2posZ[140];
+Double_t fHe3Id2diameter[140];
+Double_t fHe3Id2ring[140];
+Double_t fHe3Id2length[140];
+Int_t id_map[20][V1740_N_MAX_CH];
+void ReadMapping(){
+    for (Int_t i=0;i<20;i++){
+        for (Int_t j=0;j<V1740_N_MAX_CH;j++){
+            id_map[i][j] = -1;
+        }
+    }
+    std::ifstream inpf((char*)"He3_mapping.txt");
+    if (inpf.fail()){
+        cout<<"No BELEN Mapping file is given"<<endl;
+        return;
+    }
+    cout<<"Start reading BELEN Mapping file: He3_mapping.txt"<<endl;
+
+    Int_t id,index1,index2;
+    UShort_t ring;
+    Double_t x,y,z;
+    Double_t d,length;
+    Int_t mm=0;
+    while (inpf.good()){
+        inpf>>id>>index1>>index2>>d>>x>>y>>z>>ring>>length;
+        if (id<=500){//for he3
+            fHe3Id2posX[id]=x;
+            fHe3Id2posY[id]=y;
+            fHe3Id2posZ[id]=z;
+            fHe3Id2diameter[id]=d;
+            fHe3Id2ring[id]=ring;
+            fHe3Id2length[id]=length;
+            id_map[index1][index2] = id;
+        }
+        //cout<<He3id<<"-"<<daqId<<"-"<<d<<"-"<<x<<"-"<<y<<"-"<<z<<endl;
+        mm++;
+    }
+    cout<<"Read "<<mm<<" line"<<endl;
+    inpf.close();
+}
 
 void Init(){
-    treedata = new NIGIRI;
+    h1corr = new TH1F("h1corr","h1corr",2560,-256000,256000);
+    h2corr = new TH1F("h2corr","h2corr",2560,-256000,256000);
+    h3corr = new TH1F("h3corr","h3corr",2560,-256000,256000);
+    h4corr = new TH1F("h4corr","h4corr",500,-40,40);
+
+    h2d_brikenhit = new TH2F("h2d_brikenhit","h2d_brikenhit",400,-400,400,400,-400,400);
+
     for (Int_t i=0;i<64*3;i++){
         hwf2d[i]=new TH2F(Form("hwf2d%d",i),Form("hwf2d%d",i),300,0,300,500,0,4000);
     }
     he2d = new TH2F("he2d","he2d",64*3,0,64*3,500,0,4000);
+    belendata = new BrikenTreeData;
+    belendata->Clear();
+    ReadMapping();
+
+    //data_ich = new NIGIRI;
+    fcorr =new correlation(400000,400000);
+    fcorr->SetMultipleCorrelation();
+    fcorr->SetHisto1D(h1corr,0);
+    fcorr->SetHisto1D(h2corr,1);
+    fcorr->SetHisto1D(h3corr,2);
+    fcorr->SetHisto1D(h4corr,3);
+    fcorr->SetHisto2D(hwf2d[0],0);
 }
 
-void ProcessEvent(NIGIRI* data_now,Bool_t isdelete=false){
-    treedata->Clear();
-    data_now->Copy(*treedata);
-    tree->Fill();
-    if (isdelete) delete data_now;
+NIGIRI* data_prev=0;
+void ProcessEvent(NIGIRI* data_now){
+    if (data_now->b==5){
+        for (Int_t ch=0;ch<V1740_N_MAX_CH;ch++){
+            if (data_now->GetHit(ch)->clong>0){
+                NIGIRI* data_ich = new NIGIRI;
+                data_now->CopyHeader(*data_ich);
+                data_ich->ts = data_now->GetHit(ch)->ts;
+                NIGIRIHit* hit = (NIGIRIHit*)data_now->GetHit(ch)->Clone();
+                data_ich->AddHit(hit);
+                fcorr->fillMap(false,data_ich);
+            }
+        }
+        //delete data_now;
+        //data_now->Print();
+//        for (Int_t ch=0;ch<V1740_N_MAX_CH;ch++){
+//            if (data_now->GetHit(ch)->clong>0){
+//                belendata->Id = id_map[data_now->b][ch];
+//                belendata->T = data_now->GetHit(ch)->ts;
+//                belendata->E = data_now->GetHit(ch)->clong;
+//                belendata->Index1 = data_now->b;
+//                belendata->Index2 = ch;
+
+//                if (belendata->Id>0){//draw 2d hist
+//                    Double_t fposX = fHe3Id2posX[belendata->Id];
+//                    Double_t fposY = fHe3Id2posY[belendata->Id];
+//                    Double_t fposZ = fHe3Id2posZ[belendata->Id];
+//                    //! pertubating
+//                    Double_t a,b,x,y,r;
+//                    r=fHe3Id2diameter[belendata->Id]/2;
+//                    a=rr.Rndm();
+//                    b=rr.Rndm();
+//                    genRndCircle(x,y,a,b,fposX,fposY,r);
+//                    fposX = x;
+//                    fposY = y;
+//                    fposZ = rr.Rndm()*fHe3Id2length[belendata->Id]+fposZ-fHe3Id2length[belendata->Id]/2;
+//                    h2d_brikenhit->Fill(x,y);
+//                }
+//                if (tree) tree->Fill();
+//            }
+//        }
+
+        for (Int_t ch=0;ch<V1740_N_MAX_CH;ch++){
+            if (data_now->GetHit(ch)->clong>0){
+                Int_t idch = (data_now->b-4)*V1740_N_MAX_CH+ch;
+                Int_t itcnt= 0 ;
+                for (std::vector<UShort_t>::iterator it = data_now->GetHit(ch)->pulse.begin() ; it != data_now->GetHit(ch)->pulse.end(); ++it){
+                    if (itcnt<N_MAX_WF_LENGTH){
+                        hwf2d[idch]->Fill(itcnt,*it);
+                    }
+                    itcnt++;
+                }
+                he2d->Fill(idch,data_now->GetHit(ch)->clong);
+            }
+        }
+//        delete data_now;
+    }
 }
 
 void DoUpdate(){
-    pstatus();
+    //pstatus();
 }
 
 void OpenFile(const char* filename){
     file0 = new TFile(filename,"recreate");
     tree = new TTree("tree","tree");
-    tree->Branch("data",&treedata);
+    tree->Branch("Neutrons.",&belendata);
+    //tree->Branch("data",&data_ich);
 }
 
 void CloseMe(){
     if (file0) {
         if (tree) tree->Write();
+        h2d_brikenhit->Write();
         file0->Close();
     }
-    cout<<nevt<<endl;
 }
+
 
 //!**************************************************
 //! Data decoding
 //! *************************************************
-
 //! parameters for decoding V1740 zerosuppression
 #define V1740_HDR 6
 
@@ -103,15 +235,20 @@ typedef enum{
 //const int packetmap[]={49,50,51,52,53,54,55,56,100,101};
 //const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA};
 //! current map
-const int packetmap[]={50,51,52,53,54,55,56,100,101};
-const pmap_decode packetdecode[]={V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA};
+const int packetmap[]={49,54,55,56,100,101};
+const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA};
+
 
 UShort_t ledthr[20][V1740_N_MAX_CH];
 
-NIGIRI* data_prev[MAX_N_BOARD];
+Int_t n_incomplete_pulses[7];
+double prev_finets[20][V1740_N_MAX_CH];
+double prev_clong[20][V1740_N_MAX_CH];
+double prev_cshort[20][V1740_N_MAX_CH];
+UShort_t prev_ts[20][V1740_N_MAX_CH];
+//std::vector<UShort_t> pulse_prev[20][V1740_N_MAX_CH];
 
 int init_done = 0;
-
 
 struct refesh_thread_argument
 {
@@ -148,13 +285,15 @@ int pinit()
 
   gROOT->ProcessLine(".L libDataStruct.so");
   data=new NIGIRI;
-  for (Int_t i=0;i<MAX_N_BOARD;i++){
-      data_prev[i]=0;
+  for (Int_t i=0;i<20;i++){
+      if (i<7) n_incomplete_pulses[i]=0;
       for (Int_t j=0;j<V1740_N_MAX_CH;j++){
           ledthr[i][j]=1550;
+          prev_finets[i][j]=0;
+          prev_clong[i][j]=0;
+          prev_ts[i][j]=0;
       }
   }
-
 
   Init();
   return 0;
@@ -183,6 +322,7 @@ void decodeV1740raw(Packet* p1740raw){
 double thr_abs = 150;
 
 void decodeV1740zsp(Packet* p1740zsp){
+
     //!**************************************************
     //! v1740 with zerosuppresion data packet
     //! *************************************************
@@ -195,12 +335,18 @@ void decodeV1740zsp(Packet* p1740zsp){
     //cout<<"\n********** "<<nEvents<<" ***********\n"<<endl;
     int k=0;
 
+
     for (Int_t i=0;i<nEvents;i++){
         data->Clear();
         int headaddr = k;
         data->DecodeHeaderZsp(&gg[k],p1740zsp->getHitFormat());
         k+=V1740_HDR+V1740_N_MAX_CH;
         //! get number of channels from channel mask
+
+
+        if (gg[headaddr+V1740_HDR]>NSBL &&gg[headaddr+V1740_HDR]<N_MAX_WF_LENGTH) {//handle incomplete pulses
+            data->board_fail_flag = 1;
+        }
         double min_finets = 99999;
         int ich_min_finets = -1;
         for (int i=0;i<V1740_N_MAX_CH;i++){
@@ -210,9 +356,6 @@ void decodeV1740zsp(Packet* p1740zsp){
             NIGIRIHit* chdata=new NIGIRIHit;
             chdata->ch = i;//for sorter
             int nsample = gg[headaddr+V1740_HDR+i];
-            if (nsample>NSBL&&nsample<N_MAX_WF_LENGTH){
-                data->board_fail_flag = 1;
-            }
             chdata->nsample = nsample;
             UShort_t WaveLine[nsample];
             int ispl = 0;
@@ -231,9 +374,7 @@ void decodeV1740zsp(Packet* p1740zsp){
                 k++;
             }
             //!--------------------
-            if (nsample>NSBL){
-                chdata->processPulseV1740(data->ts,NSBL,ledthr[data->b][chdata->ch],trig_pos,sampling_interval);
-            }
+            chdata->processPulseV1740(data->ts,NSBL,ledthr[data->b][chdata->ch],trig_pos,sampling_interval);
 
             if (chdata->finets<min_finets&&chdata->finets>=0){
                 min_finets =chdata->finets;
@@ -242,16 +383,66 @@ void decodeV1740zsp(Packet* p1740zsp){
             data->AddHit(chdata);
         }//loop all channels
         data->trig_ch = ich_min_finets;
+        //if (ich_min_finets==-1) cout<<"no trigger found!"<<endl;
 
+        //! handle board fail flag
         if (data->board_fail_flag==1){
-            data_prev[data->b]->MergePulse(data,data_prev[data->b]->ts,NSBL,ledthr[data->b],trig_pos,sampling_interval);
+            double min_finets_bf = 99999;
+            int ich_min_finets_bf = -1;
+            for (Int_t ch=0;ch<V1740_N_MAX_CH;ch++){//the rest of channels
+                if (ch == data_prev->trig_ch) continue;
+                if (data_prev->GetHit(ch)->finets==-1&&data->GetHit(ch)->finets>=0){//get clong from current one
+                    data->GetHit(ch)->ts = data->ts;
+                    int extended_finets = data_prev->GetHit(ch)->pulse.size()+data->GetHit(ch)->finets;
+                    if (extended_finets<min_finets_bf){
+                        min_finets_bf =extended_finets;
+                        ich_min_finets_bf = ch;
+                    }
+                }else if (data_prev->GetHit(ch)->finets>=trig_pos+N_MAX_WF_LENGTH/2){//get clong from either current or previou one
+                    data->GetHit(ch)->ts = data->ts;
+                    if (data_prev->GetHit(ch)->finets<min_finets_bf){
+                        min_finets_bf = data_prev->GetHit(ch)->finets;
+                        ich_min_finets_bf = ch;
+                    }
+                    //! for energy calculation
+                    if (data->GetHit(ch)->finets>=0){//!if both now and prev has data
+                        if (data->GetHit(ch)->clong<data_prev->GetHit(ch)->clong){//Get clong from previous data
+                            data->GetHit(ch)->clong = data_prev->GetHit(ch)->clong;
+                        }
+                    }else{
+                        data->GetHit(ch)->clong = data_prev->GetHit(ch)->clong;
+                    }
+                }
+            }
+            data->trig_ch = ich_min_finets_bf;
+            for (Int_t ch=0;ch<V1740_N_MAX_CH;ch++){
+                if (ch!=data->trig_ch||ich_min_finets_bf==-1)
+                    data->GetHit(ch)->clong  = -9999;
+                if (data->GetHit(ch)->clong>0){//remove previous events
+                    data_prev->GetHit(ch)->clong = -9999;
+                }
+            }
         }
         //! process data
-        if (data_prev[data->b]!=0){
-            if (data_prev[data->b]->board_fail_flag!=1)
-                ProcessEvent(data_prev[data->b],true);
+        if (data_prev!=0){
+            if (data_prev->board_fail_flag==0){
+                for (Int_t ch=0;ch<V1740_N_MAX_CH;ch++){//the rest of channels
+                    if (ch!=data_prev->trig_ch){//only channels other than trigger channel
+//                        if (!(data_prev->GetHit(ch)->finets>=trig_pos&&data_prev->GetHit(ch)->finets<N_MAX_WF_LENGTH/2+trig_pos)){
+//                            data_prev->GetHit(ch)->clong  = -9999;
+//                        }
+                        data_prev->GetHit(ch)->clong  = -9999;
+                    }else{
+                        data_prev->GetHit(ch)->ts = data_prev->ts;
+                    }
+                    if (data_prev->trig_ch==-1){
+                        data_prev->GetHit(ch)->clong  = -9999;
+                    }
+                }
+            }
+            ProcessEvent(data_prev);
         }
-        data_prev[data->b] = (NIGIRI*) data->Clone();
+        data_prev = (NIGIRI*) data->Clone();
     }
     delete p1740zsp;
 }
@@ -389,7 +580,6 @@ void decodelupo(Packet* pLUPO){
 
 int process_event (Event * e)
 {
-    nevt++;
 //    time_t tevt =e->getTime();
 //    cout<<"***************** Eventpacket number  = "<<e->getEvtSequence()<<" / record date time"<<asctime(gmtime(&tevt))<<"***************\n"<<endl;
     Packet *pmap[N_PACKETMAP];

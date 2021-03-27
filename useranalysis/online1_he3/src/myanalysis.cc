@@ -46,12 +46,10 @@ NIGIRI* data;
 TH2F* hwf2d[V1740_N_MAX_CH*10];
 TH2F* he2d;
 
-NIGIRI * treedata;
 
 int nevt = 0;
 
 void Init(){
-    treedata = new NIGIRI;
     for (Int_t i=0;i<64*3;i++){
         hwf2d[i]=new TH2F(Form("hwf2d%d",i),Form("hwf2d%d",i),300,0,300,500,0,4000);
     }
@@ -59,9 +57,16 @@ void Init(){
 }
 
 void ProcessEvent(NIGIRI* data_now,Bool_t isdelete=false){
-    treedata->Clear();
-    data_now->Copy(*treedata);
-    tree->Fill();
+    if (data_now->b==4||data_now->b==5||data_now->b==6){
+        for (Int_t i=0;i<V1740_N_MAX_CH;i++){
+            NIGIRIHit* hit=data_now->GetHit(i);
+            Int_t ch = hit->ch+(data_now->b-4)*V1740_N_MAX_CH;
+            Int_t itcnt= 0 ;
+            cout<<hit->pulse.size()<<endl;
+
+            if (hit->clong>0) he2d->Fill(ch,hit->clong);
+        }
+    }
     if (isdelete) delete data_now;
 }
 
@@ -72,7 +77,6 @@ void DoUpdate(){
 void OpenFile(const char* filename){
     file0 = new TFile(filename,"recreate");
     tree = new TTree("tree","tree");
-    tree->Branch("data",&treedata);
 }
 
 void CloseMe(){

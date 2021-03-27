@@ -88,7 +88,6 @@ public:
         pulse_ap1.clear();
         pulse_ap2.clear();
     }
-
     void Print(){
         cout<<"ch = "<<ch<<endl;
         cout<<"ch ts = "<<ts<<endl;
