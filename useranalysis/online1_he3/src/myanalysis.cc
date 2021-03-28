@@ -56,22 +56,27 @@ void Init(){
     he2d = new TH2F("he2d","he2d",64*3,0,64*3,500,0,4000);
 }
 
-void ProcessEvent(NIGIRI* data_now,Bool_t isdelete=false){
+void ProcessEvent(NIGIRI* data_now){
     if (data_now->b==4||data_now->b==5||data_now->b==6){
         for (Int_t i=0;i<V1740_N_MAX_CH;i++){
             NIGIRIHit* hit=data_now->GetHit(i);
             Int_t ch = hit->ch+(data_now->b-4)*V1740_N_MAX_CH;
             Int_t itcnt= 0 ;
-            cout<<hit->pulse.size()<<endl;
-
-            if (hit->clong>0) he2d->Fill(ch,hit->clong);
+            if (hit->clong>0){
+                for (std::vector<UShort_t>::iterator it =hit->pulse.begin() ; it != hit->pulse.end(); ++it){
+                    //if (itcnt<N_MAX_WF_LENGTH){
+                        hwf2d[ch]->Fill(itcnt,*it);
+                    //}
+                    itcnt++;
+                }
+                he2d->Fill(ch,hit->clong);
+            }
         }
     }
-    if (isdelete) delete data_now;
 }
 
 void DoUpdate(){
-    pstatus();
+    //pstatus();
 }
 
 void OpenFile(const char* filename){
@@ -107,8 +112,8 @@ typedef enum{
 //const int packetmap[]={49,50,51,52,53,54,55,56,100,101};
 //const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA};
 //! current map
-const int packetmap[]={50,51,52,53,54,55,56,100,101};
-const pmap_decode packetdecode[]={V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA};
+const int packetmap[]={49,50,51,52,53,54,55,56,100,101};
+const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA};
 
 UShort_t ledthr[20][V1740_N_MAX_CH];
 
@@ -153,7 +158,7 @@ int pinit()
   gROOT->ProcessLine(".L libDataStruct.so");
   data=new NIGIRI;
   for (Int_t i=0;i<MAX_N_BOARD;i++){
-      data_prev[i]=0;
+      data_prev[i]=new NIGIRI;
       for (Int_t j=0;j<V1740_N_MAX_CH;j++){
           ledthr[i][j]=1550;
       }
@@ -180,7 +185,6 @@ void decodeV1740raw(Packet* p1740raw){
         ipos+=data->event_size;
         ProcessEvent(data);
     }//end of event loop
-    delete p1740raw;
 }
 
 #define TSCORR 6
@@ -250,14 +254,16 @@ void decodeV1740zsp(Packet* p1740zsp){
         if (data->board_fail_flag==1){
             data_prev[data->b]->MergePulse(data,data_prev[data->b]->ts,NSBL,ledthr[data->b],trig_pos,sampling_interval);
         }
+        //ProcessEvent(data);
         //! process data
         if (data_prev[data->b]!=0){
             if (data_prev[data->b]->board_fail_flag!=1)
-                ProcessEvent(data_prev[data->b],true);
+                ProcessEvent(data_prev[data->b]);
+            data_prev[data->b]->Clear();
         }
-        data_prev[data->b] = (NIGIRI*) data->Clone();
+        data->Copy(*data_prev[data->b]);
+        //data_prev[data->b] = (NIGIRI*) data->Clone();
     }
-    delete p1740zsp;
 }
 
 void decodeV1730dpppha(Packet* p1730dpppha){
@@ -371,7 +377,6 @@ void decodeV1730dpppha(Packet* p1730dpppha){
         }//loop through all  dual channels data
     }//end loop on all words
     //std::cout<<"---"<<std::endl;
-    delete p1730dpppha;
 }
 
 void decodelupo(Packet* pLUPO){
@@ -388,7 +393,6 @@ void decodelupo(Packet* pLUPO){
     data->pattern= gg[1];//daq counter
     data->evt = gg[0];
     ProcessEvent(data);
-    delete pLUPO;
 }
 
 int process_event (Event * e)
@@ -411,6 +415,7 @@ int process_event (Event * e)
             }else{
                 cout<<"out of definition!"<<endl;
             }
+            delete pmap[i];
 #ifdef SLOW_ONLINE
     usleep(SLOW_ONLINE);
 #endif

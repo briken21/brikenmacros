@@ -58,11 +58,10 @@ void Init(){
     he2d = new TH2F("he2d","he2d",64*3,0,64*3,500,0,4000);
 }
 
-void ProcessEvent(NIGIRI* data_now,Bool_t isdelete=false){
+void ProcessEvent(NIGIRI* data_now){
     treedata->Clear();
     data_now->Copy(*treedata);
     tree->Fill();
-    if (isdelete) delete data_now;
 }
 
 void DoUpdate(){
@@ -249,11 +248,12 @@ void decodeV1740zsp(Packet* p1740zsp){
         //! process data
         if (data_prev[data->b]!=0){
             if (data_prev[data->b]->board_fail_flag!=1)
-                ProcessEvent(data_prev[data->b],true);
+                ProcessEvent(data_prev[data->b]);
+
+            delete data_prev[data->b];
         }
         data_prev[data->b] = (NIGIRI*) data->Clone();
     }
-    delete p1740zsp;
 }
 
 void decodeV1730dpppha(Packet* p1730dpppha){
@@ -366,8 +366,6 @@ void decodeV1730dpppha(Packet* p1730dpppha){
             //pos+=channelaggr.size;
         }//loop through all  dual channels data
     }//end loop on all words
-    //std::cout<<"---"<<std::endl;
-    delete p1730dpppha;
 }
 
 void decodelupo(Packet* pLUPO){
@@ -384,7 +382,6 @@ void decodelupo(Packet* pLUPO){
     data->pattern= gg[1];//daq counter
     data->evt = gg[0];
     ProcessEvent(data);
-    delete pLUPO;
 }
 
 int process_event (Event * e)
