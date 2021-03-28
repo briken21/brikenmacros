@@ -44,25 +44,43 @@ TTree* tree = 0;
 NIGIRI* data;
 
 TH2F* hwf2d[V1740_N_MAX_CH*10];
+TH1F* hrate;
+TH1F* hrateupdate;
+
 TH2F* he2d;
 
+TH1F* he1d_clover[16];
 
 int nevt = 0;
+
+
 
 void Init(){
     for (Int_t i=0;i<64*3;i++){
         hwf2d[i]=new TH2F(Form("hwf2d%d",i),Form("hwf2d%d",i),300,0,300,500,0,4000);
+
+        if (i<16){
+            he1d_clover[i]=new TH1F(Form("he1d_clover%d",i),Form("he1d_clover%d",i),1000,0,40000);
+        }
     }
+    hrate = new TH1F("hrate","hrate",64*3,0,64*3);
+    hrateupdate = new TH1F("hrateupdate","hrateupdate",64*3,0,64*3);
+
     he2d = new TH2F("he2d","he2d",64*3,0,64*3,500,0,4000);
 }
 
 void ProcessEvent(NIGIRI* data_now){
+    if (data_now->b==7){
+        if (data_now->GetHit(0)->clong>0)
+            he1d_clover[data_now->GetHit(0)->ch]->Fill(data_now->GetHit(0)->clong);
+    }
     if (data_now->b==4||data_now->b==5||data_now->b==6){
         for (Int_t i=0;i<V1740_N_MAX_CH;i++){
             NIGIRIHit* hit=data_now->GetHit(i);
             Int_t ch = hit->ch+(data_now->b-4)*V1740_N_MAX_CH;
             Int_t itcnt= 0 ;
             if (hit->clong>0){
+                if (hit->clong>100) hrateupdate->Fill(ch);
                 for (std::vector<UShort_t>::iterator it =hit->pulse.begin() ; it != hit->pulse.end(); ++it){
                     //if (itcnt<N_MAX_WF_LENGTH){
                         hwf2d[ch]->Fill(itcnt,*it);
@@ -76,6 +94,10 @@ void ProcessEvent(NIGIRI* data_now){
 }
 
 void DoUpdate(){
+    for (Int_t i=0;i<hrateupdate->GetNbinsX();i++){
+        hrate->SetBinContent(i+1,hrateupdate->GetBinContent(i+1)/RATE_CAL_REFESH_SECONDS);
+    }
+    hrateupdate->Reset();
     //pstatus();
 }
 
