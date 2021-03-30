@@ -115,8 +115,8 @@ int rcdaqEventiterator::setup(const char *ip, int &status)
 
   online->set(zmq::sockopt::subscribe, "");//subcribe all
   //! only get last mess from queue
-  //online->set(zmq::sockopt::conflate,1);
-  online->set(zmq::sockopt::rcvhwm,10);
+  online->set(zmq::sockopt::conflate,1);
+  //online->set(zmq::sockopt::rcvhwm,10);
   //  int hmw =2;
   //  online->setsockopt(ZMQ_RCVHWM,&hmw, sizeof(hmw));
   //  int bufsize = hmw*1024;
