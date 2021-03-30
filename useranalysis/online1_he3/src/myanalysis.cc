@@ -81,12 +81,12 @@ void ProcessEvent(NIGIRI* data_now){
             Int_t itcnt= 0 ;
             if (hit->clong>0){
                 if (hit->clong>100) hrateupdate->Fill(ch);
-                for (std::vector<UShort_t>::iterator it =hit->pulse.begin() ; it != hit->pulse.end(); ++it){
-                    //if (itcnt<N_MAX_WF_LENGTH){
-                        hwf2d[ch]->Fill(itcnt,*it);
-                    //}
-                    itcnt++;
-                }
+//                for (std::vector<UShort_t>::iterator it =hit->pulse.begin() ; it != hit->pulse.end(); ++it){
+//                    //if (itcnt<N_MAX_WF_LENGTH){
+//                        hwf2d[ch]->Fill(itcnt,*it);
+//                    //}
+//                    itcnt++;
+//                }
                 he2d->Fill(ch,hit->clong);
             }
         }
