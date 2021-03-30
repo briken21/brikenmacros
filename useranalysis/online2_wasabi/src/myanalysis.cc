@@ -44,34 +44,63 @@ TTree* tree = 0;
 NIGIRI* data;
 
 TH2F* hwf2d[V1740_N_MAX_CH*10];
+TH1F* hrate;
+TH1F* hrateupdate;
+
 TH2F* he2d;
 
-NIGIRI * treedata;
+TH1F* he1d_clover[16];
 
 int nevt = 0;
 
+
+
 void Init(){
-    treedata = new NIGIRI;
-    for (Int_t i=0;i<64*3;i++){
+    for (Int_t i=0;i<V1740_N_MAX_CH*8;i++){
         hwf2d[i]=new TH2F(Form("hwf2d%d",i),Form("hwf2d%d",i),300,0,300,500,0,4000);
+
+        if (i<16){
+            he1d_clover[i]=new TH1F(Form("he1d_clover%d",i),Form("he1d_clover%d",i),1000,0,40000);
+        }
     }
-    he2d = new TH2F("he2d","he2d",64*3,0,64*3,500,0,4000);
+    hrate = new TH1F("hrate","hrate",V1740_N_MAX_CH*8,0,V1740_N_MAX_CH*8);
+    hrateupdate = new TH1F("hrateupdate","hrateupdate",64*3,0,64*3);
+
+    he2d = new TH2F("he2d","he2d",V1740_N_MAX_CH*8,0,V1740_N_MAX_CH*8,500,0,4000);
 }
 
 void ProcessEvent(NIGIRI* data_now){
-    treedata->Clear();
-    data_now->Copy(*treedata);
-    tree->Fill();
+
+    if (data_now->b<8&&data_now->b>=0){
+        for (Int_t i=0;i<V1740_N_MAX_CH;i++){
+            NIGIRIHit* hit=data_now->GetHit(i);
+            Int_t ch = hit->ch+data_now->b*V1740_N_MAX_CH;
+            Int_t itcnt= 0 ;
+            if (hit->clong>0){
+                if (hit->clong>100) hrateupdate->Fill(ch);
+                for (std::vector<UShort_t>::iterator it =hit->pulse.begin() ; it != hit->pulse.end(); ++it){
+                    //if (itcnt<N_MAX_WF_LENGTH){
+                        hwf2d[ch]->Fill(itcnt,*it);
+                    //}
+                    itcnt++;
+                }
+                he2d->Fill(ch,hit->clong);
+            }
+        }
+    }
 }
 
 void DoUpdate(){
-    pstatus();
+    for (Int_t i=0;i<hrateupdate->GetNbinsX();i++){
+        hrate->SetBinContent(i+1,hrateupdate->GetBinContent(i+1)/RATE_CAL_REFESH_SECONDS);
+    }
+    hrateupdate->Reset();
+    //pstatus();
 }
 
 void OpenFile(const char* filename){
     file0 = new TFile(filename,"recreate");
     tree = new TTree("tree","tree");
-    tree->Branch("data",&treedata);
 }
 
 void CloseMe(){
@@ -105,7 +134,7 @@ typedef enum{
 
 //! current map
 const int packetmap[]={50,51,52,53,54,55,56,57,58,59,60,100};
-const pmap_decode packetdecode[]={NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA};
+const pmap_decode packetdecode[]={V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,NONE,NONE,NONE,NONE};
 
 UShort_t ledthr[MAX_N_BOARD][V1740_N_MAX_CH];
 NIGIRI* data_prev[MAX_N_BOARD];
@@ -149,7 +178,7 @@ int pinit()
   gROOT->ProcessLine(".L libDataStruct.so");
   data=new NIGIRI;
   for (Int_t i=0;i<MAX_N_BOARD;i++){
-      data_prev[i]=0;
+      data_prev[i]=new NIGIRI;
       for (Int_t j=0;j<V1740_N_MAX_CH;j++){
           ledthr[i][j]=1550;
       }
@@ -209,7 +238,7 @@ void decodeV1740zsp(Packet* p1740zsp){
             NIGIRIHit* chdata=new NIGIRIHit;
             chdata->ch = i;//for sorter
             int nsample = gg[headaddr+V1740_HDR+i];
-            if (nsample>NSBL&&nsample<N_MAX_WF_LENGTH){//!
+            if (nsample>NSBL&&nsample<N_MAX_WF_LENGTH){
                 data->board_fail_flag = 1;
             }
             chdata->nsample = nsample;
@@ -245,13 +274,15 @@ void decodeV1740zsp(Packet* p1740zsp){
         if (data->board_fail_flag==1){
             data_prev[data->b]->MergePulse(data,data_prev[data->b]->ts,NSBL,ledthr[data->b],trig_pos,sampling_interval);
         }
+        //ProcessEvent(data);
         //! process data
         if (data_prev[data->b]!=0){
             if (data_prev[data->b]->board_fail_flag!=1)
                 ProcessEvent(data_prev[data->b]);
-            delete data_prev[data->b];
+            data_prev[data->b]->Clear();
         }
-        data_prev[data->b] = (NIGIRI*) data->Clone();
+        data->Copy(*data_prev[data->b]);
+        //data_prev[data->b] = (NIGIRI*) data->Clone();
     }
 }
 
@@ -365,6 +396,7 @@ void decodeV1730dpppha(Packet* p1730dpppha){
             //pos+=channelaggr.size;
         }//loop through all  dual channels data
     }//end loop on all words
+    //std::cout<<"---"<<std::endl;
 }
 
 void decodelupo(Packet* pLUPO){
