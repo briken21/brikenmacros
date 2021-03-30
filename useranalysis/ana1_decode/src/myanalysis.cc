@@ -92,6 +92,7 @@ void CloseMe(){
 //! packet map
 #define N_PACKETMAP 10
 typedef enum{
+    NONE = 0,
     LUPO = 1,
     V1740ZSP = 2,
     V1740RAW = 3,
@@ -99,14 +100,14 @@ typedef enum{
 }pmap_decode;
 
 //! full map
-//const int packetmap[]={49,50,51,52,53,54,55,56,100,101};
-//const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA};
+//const int packetmap[]={50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
+//const pmap_decode packetdecode[]={V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
+
 //! current map
-const int packetmap[]={50,51,52,53,54,55,56,100,101};
-const pmap_decode packetdecode[]={V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA};
+const int packetmap[]={58,59,60,100};
+const pmap_decode packetdecode[]={V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA};
 
-UShort_t ledthr[20][V1740_N_MAX_CH];
-
+UShort_t ledthr[MAX_N_BOARD][V1740_N_MAX_CH];
 NIGIRI* data_prev[MAX_N_BOARD];
 
 int init_done = 0;
@@ -175,7 +176,6 @@ void decodeV1740raw(Packet* p1740raw){
         ipos+=data->event_size;
         ProcessEvent(data);
     }//end of event loop
-    delete p1740raw;
 }
 
 #define TSCORR 6
@@ -209,7 +209,7 @@ void decodeV1740zsp(Packet* p1740zsp){
             NIGIRIHit* chdata=new NIGIRIHit;
             chdata->ch = i;//for sorter
             int nsample = gg[headaddr+V1740_HDR+i];
-            if (nsample>NSBL&&nsample<N_MAX_WF_LENGTH){
+            if (nsample>NSBL&&nsample<N_MAX_WF_LENGTH){//!
                 data->board_fail_flag = 1;
             }
             chdata->nsample = nsample;
@@ -249,7 +249,6 @@ void decodeV1740zsp(Packet* p1740zsp){
         if (data_prev[data->b]!=0){
             if (data_prev[data->b]->board_fail_flag!=1)
                 ProcessEvent(data_prev[data->b]);
-
             delete data_prev[data->b];
         }
         data_prev[data->b] = (NIGIRI*) data->Clone();
@@ -402,8 +401,9 @@ int process_event (Event * e)
             }else if (packetdecode[i]==V1730DPPPHA){
                 decodeV1730dpppha(pmap[i]);
             }else{
-                cout<<"out of definition!"<<endl;
+                //cout<<"out of definition!"<<endl;
             }
+            delete pmap[i];
 #ifdef SLOW_ONLINE
     usleep(SLOW_ONLINE);
 #endif

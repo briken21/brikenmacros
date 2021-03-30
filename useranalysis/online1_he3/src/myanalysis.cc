@@ -70,14 +70,14 @@ void Init(){
 }
 
 void ProcessEvent(NIGIRI* data_now){
-    if (data_now->b==7){
+    if (data_now->b==11){
         if (data_now->GetHit(0)->clong>0)
             he1d_clover[data_now->GetHit(0)->ch]->Fill(data_now->GetHit(0)->clong);
     }
-    if (data_now->b==4||data_now->b==5||data_now->b==6){
+    if (data_now->b==8||data_now->b==9||data_now->b==10){
         for (Int_t i=0;i<V1740_N_MAX_CH;i++){
             NIGIRIHit* hit=data_now->GetHit(i);
-            Int_t ch = hit->ch+(data_now->b-4)*V1740_N_MAX_CH;
+            Int_t ch = hit->ch+(data_now->b-8)*V1740_N_MAX_CH;
             Int_t itcnt= 0 ;
             if (hit->clong>0){
                 if (hit->clong>100) hrateupdate->Fill(ch);
@@ -124,6 +124,7 @@ void CloseMe(){
 //! packet map
 #define N_PACKETMAP 10
 typedef enum{
+    NONE = 0,
     LUPO = 1,
     V1740ZSP = 2,
     V1740RAW = 3,
@@ -131,14 +132,14 @@ typedef enum{
 }pmap_decode;
 
 //! full map
-//const int packetmap[]={49,50,51,52,53,54,55,56,100,101};
-//const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA};
+//const int packetmap[]={50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
+//const pmap_decode packetdecode[]={V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
+
 //! current map
-const int packetmap[]={49,50,51,52,53,54,55,56,100,101};
-const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA};
+const int packetmap[]={58,59,60,100};
+const pmap_decode packetdecode[]={V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA};
 
-UShort_t ledthr[20][V1740_N_MAX_CH];
-
+UShort_t ledthr[MAX_N_BOARD][V1740_N_MAX_CH];
 NIGIRI* data_prev[MAX_N_BOARD];
 
 int init_done = 0;
@@ -435,7 +436,7 @@ int process_event (Event * e)
             }else if (packetdecode[i]==V1730DPPPHA){
                 decodeV1730dpppha(pmap[i]);
             }else{
-                cout<<"out of definition!"<<endl;
+                //cout<<"out of definition!"<<endl;
             }
             delete pmap[i];
 #ifdef SLOW_ONLINE
