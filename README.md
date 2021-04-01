@@ -6,7 +6,7 @@ mkdir build_onlinelib
 
 cd build_onlinelib
 
-cmake -DCMAKE_INSTALL_PREFIX=/path/to/installation_dir /path/to/brikenmacros/onlinlib
+cmake -DCMAKE_INSTALL_PREFIX=/path/to/installation_dir /path/to/brikenmacros/onlinelib
 
 make install
 
