@@ -26,7 +26,7 @@ make install
 
 source /path/to/installation_dir/bin/setuponline.sh
 
-In mi case: source /home/maxpallas/data/briken2021/brikenmacros/OnlineLibraries_Test/bin/setuponline.sh
+In my case: source /home/maxpallas/data/briken2021/brikenmacros/OnlineLibraries_Test/bin/setuponline.sh
 5) Now everything should work properly.  Using myanalysis.cc some warnings appear but the code seems to run properly. 
 
 
