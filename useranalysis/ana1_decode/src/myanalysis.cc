@@ -90,7 +90,6 @@ void CloseMe(){
 #define V1740_HDR 6
 
 //! packet map
-#define N_PACKETMAP 10
 typedef enum{
     NONE = 0,
     LUPO = 1,
@@ -100,12 +99,13 @@ typedef enum{
 }pmap_decode;
 
 //! full map
-//const int packetmap[]={50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
-//const pmap_decode packetdecode[]={V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
+//#define N_PACKETMAP 16
+//const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,100,101,102,103};
+//const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
 
-//! current map
-const int packetmap[]={50,51,52,53,54,55,56,57,58,59,60,100};
-const pmap_decode packetdecode[]={NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA};
+#define N_PACKETMAP 16
+const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
+const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
 
 UShort_t ledthr[MAX_N_BOARD][V1740_N_MAX_CH];
 NIGIRI* data_prev[MAX_N_BOARD];
@@ -243,7 +243,7 @@ void decodeV1740zsp(Packet* p1740zsp){
         data->trig_ch = ich_min_finets;
 
         if (data->board_fail_flag==1){
-            data_prev[data->b]->MergePulse(data,data_prev[data->b]->ts,NSBL,ledthr[data->b],trig_pos,sampling_interval);
+            data_prev[data->b]->MergePulse(data,data_prev[data->b]->ts,NSBL,ledthr[data->b],trig_pos,sampling_interval,N_MAX_WF_LENGTH);
         }
         //! process data
         if (data_prev[data->b]!=0){
