@@ -37,90 +37,33 @@
 #define NSBL 8
 #define N_MAX_WF_LENGTH 90
 UShort_t trig_pos = N_MAX_WF_LENGTH*30/100;//unit of sample
-UShort_t sampling_interval = 16*16;//unit of ns
+UShort_t sampling_interval = 16*8;//unit of ns
 
 TFile* file0 = 0;
 TTree* tree = 0;
 NIGIRI* data;
 
-#define DIGITAL_PROBE_OFFSET 4000
-#define DIGITAL_PROBE_GAIN 1000
-
-#define TRG_PROBE_OFFSET 3000
-#define TRG_PROBE_GAIN 1000
-
-
-TH2F *hap1trace2d[V1730_MAX_N_CH];
-TH2F *hap2trace2d[V1730_MAX_N_CH];
-
-TH2F *he2d;
-TH1F *henergy[V1730_MAX_N_CH*4];
-TH1F *hap1trace1d[V1730_MAX_N_CH*4];
-TH1F *hap2trace1d[V1730_MAX_N_CH*4];
-TH1F *hdptrace1d[V1730_MAX_N_CH*4];
-TH1F *htrgtrace1d[V1730_MAX_N_CH*4];
-
 int nevt = 0;
 
+int nevtb[MAX_N_BOARD];
+
 void Init(){
-    for (Int_t ch=0;ch<V1730_MAX_N_CH*4;ch++){
-        htrgtrace1d[ch]=new TH1F(Form("htrgtrace1d%d",ch),Form("htrgtrace1d%d",ch),10000,0,20000);
-        hdptrace1d[ch]=new TH1F(Form("hdptrace1d%d",ch),Form("hdptrace1d%d",ch),10000,0,20000);
-        hap1trace1d[ch]=new TH1F(Form("hap1trace1d%d",ch),Form("hap1trace1d%d",ch),10000,0,20000);
-        hap2trace1d[ch]=new TH1F(Form("hap2trace1d%d",ch),Form("hap2trace1d%d",ch),10000,0,20000);
-        hap1trace2d[ch]=new TH2F(Form("hap1trace2d%d",ch),Form("hap1trace2d%d",ch),10000,0,20000,1000,-pow(2,13),pow(2,13));
-        hap2trace2d[ch]=new TH2F(Form("hap2trace2d%d",ch),Form("hap2trace2d%d",ch),10000,0,20000,1000,-pow(2,13),pow(2,13));
-        henergy[ch]=new TH1F(Form("henergy%d",ch),Form("henergy%d",ch),2000,0,20000);
+
+    for (Int_t i=0;i<MAX_N_BOARD;i++){
+        nevtb[i]=0;
     }
-    he2d = new TH2F("he2d","he2d",V1730_MAX_N_CH*4,0,V1730_MAX_N_CH*4,200,0,20000);
 }
 
 void ProcessEvent(NIGIRI* data_now){
-    if (data_now->b>=11){
-        //data_now->Print();
-        NIGIRIHit* hit = data_now->GetHit(0);
-        Int_t ch = V1730_MAX_N_CH*(data_now->b-11) + hit->ch;
-        //henergy[ch]->Fill(hit->clong);
-        he2d->Fill(ch,hit->clong);
-        hap1trace1d[ch]->Reset();
-        hap2trace1d[ch]->Reset();
-        hdptrace1d[ch]->Reset();
-        htrgtrace1d[ch]->Reset();
-        int cnt = 0;
-        for (std::vector<UShort_t>::iterator it =hit->pulse_ap1.begin() ; it != hit->pulse_ap1.end(); ++it){
-            UShort_t adcitem = *it;
-            hap1trace1d[ch]->SetBinContent(cnt*2,adcitem);
-            hap1trace1d[ch]->SetBinContent(cnt*2+1,adcitem);
-            hap1trace2d[ch]->Fill(cnt*2*V1730_DGTZ_CLK_RES,adcitem);
-            hap1trace2d[ch]->Fill((cnt*2+1)*V1730_DGTZ_CLK_RES,adcitem);
-            cnt++;
-        }
-        cnt = 0;
-        for (std::vector<UShort_t>::iterator it =hit->pulse_ap2.begin() ; it != hit->pulse_ap2.end(); ++it){
-            UShort_t adcitem = *it;
-            hap2trace1d[ch]->SetBinContent(cnt*2,adcitem);
-            hap2trace1d[ch]->SetBinContent(cnt*2+1,adcitem);
-            hap2trace2d[ch]->Fill(cnt*2*V1730_DGTZ_CLK_RES,adcitem);
-            hap2trace2d[hit->ch]->Fill((cnt*2+1)*V1730_DGTZ_CLK_RES,adcitem);
-            cnt++;
-        }
-        cnt = 0;
-        for (std::vector<UShort_t>::iterator it =hit->pulse_dp1.begin() ; it != hit->pulse_dp1.end(); ++it){
-            UShort_t adcitem = *it;
-            hdptrace1d[hit->ch]->SetBinContent(cnt,adcitem*DIGITAL_PROBE_GAIN+DIGITAL_PROBE_OFFSET);
-            cnt++;
-        }
-        cnt = 0;
-        for (std::vector<UShort_t>::iterator it =hit->pulse_dp2.begin() ; it != hit->pulse_dp2.end(); ++it){
-            UShort_t adcitem = *it;
-            htrgtrace1d[hit->ch]->SetBinContent(cnt,adcitem*TRG_PROBE_GAIN+TRG_PROBE_OFFSET);
-            cnt++;
-        }
+    //if (data_now->b<11){
+    if (data_now->b==4||data_now->b==5||data_now->b==-1){
+        cout<<data_now->b<<"\t"<<data_now->ts<<endl;
+        nevtb[data_now->b]++;
     }
 }
 
 void DoUpdate(){
-    //pstatus();
+
 }
 
 void OpenFile(const char* filename){
@@ -133,7 +76,6 @@ void CloseMe(){
         if (tree) tree->Write();
         file0->Close();
     }
-    cout<<nevt<<endl;
 }
 
 //!**************************************************
@@ -144,6 +86,7 @@ void CloseMe(){
 #define V1740_HDR 6
 
 //! packet map
+
 typedef enum{
     NONE = 0,
     LUPO = 1,
@@ -152,6 +95,7 @@ typedef enum{
     V1730DPPPHA = 4,
 }pmap_decode;
 
+
 //! full map
 //#define N_PACKETMAP 16
 //const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
@@ -159,7 +103,7 @@ typedef enum{
 
 #define N_PACKETMAP 16
 const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
-const pmap_decode packetdecode[]={NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
+const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
 
 UShort_t ledthr[MAX_N_BOARD][V1740_N_MAX_CH];
 NIGIRI* data_prev[MAX_N_BOARD];
@@ -205,7 +149,7 @@ int pinit()
   for (Int_t i=0;i<MAX_N_BOARD;i++){
       data_prev[i]=new NIGIRI;
       for (Int_t j=0;j<V1740_N_MAX_CH;j++){
-          ledthr[i][j]=1550;
+          ledthr[i][j]=850;
       }
   }
 
@@ -252,63 +196,63 @@ void decodeV1740zsp(Packet* p1740zsp){
         data->Clear();
         int headaddr = k;
         data->DecodeHeaderZsp(&gg[k],p1740zsp->getHitFormat());
-        k+=V1740_HDR+V1740_N_MAX_CH;
-        //! get number of channels from channel mask
-        double min_finets = 99999;
-        int ich_min_finets = -1;
-        for (int i=0;i<V1740_N_MAX_CH;i++){
-            int chgrp = i/8;
-            if (((data->channel_mask>>chgrp)&0x1)==0) continue;
-            //! header
-            NIGIRIHit* chdata=new NIGIRIHit;
-            chdata->ch = i;//for sorter
-            int nsample = gg[headaddr+V1740_HDR+i];
-            if (nsample>NSBL&&nsample<N_MAX_WF_LENGTH){
-                data->board_fail_flag = 1;
-            }
-            chdata->nsample = nsample;
-            UShort_t WaveLine[nsample];
-            int ispl = 0;
-            for (int j=0;j<nsample/2+nsample%2;j++){
-                if (ispl<nsample) {
-                    WaveLine[ispl]=gg[k]&0xFFFF;
-                    chdata->pulse.push_back(gg[k]&0xFFFF);
+        ProcessEvent(data);
+//        k+=V1740_HDR+V1740_N_MAX_CH;
+//        //! get number of channels from channel mask
+//        double min_finets = 99999;
+//        int ich_min_finets = -1;
+//        for (int i=0;i<V1740_N_MAX_CH;i++){
+//            int chgrp = i/8;
+//            if (((data->channel_mask>>chgrp)&0x1)==0) continue;
+//            //! header
+//            NIGIRIHit* chdata=new NIGIRIHit;
+//            chdata->ch = i;//for sorter
+//            int nsample = gg[headaddr+V1740_HDR+i];
+//            if (nsample>NSBL&&nsample<N_MAX_WF_LENGTH){
+//                data->board_fail_flag = 1;
+//            }
+//            chdata->nsample = nsample;
+//            UShort_t WaveLine[nsample];
+//            int ispl = 0;
+//            for (int j=0;j<nsample/2+nsample%2;j++){
+//                if (ispl<nsample) {
+//                    WaveLine[ispl]=gg[k]&0xFFFF;
+//                    chdata->pulse.push_back(gg[k]&0xFFFF);
 
-                }
-                ispl++;
-                if (ispl<nsample) {
-                    WaveLine[ispl]=(gg[k]>>16)&0xFFFF;
-                    chdata->pulse.push_back((gg[k]>>16)&0xFFFF);
-                }
-                ispl++;
-                k++;
-            }
-            //!--------------------
-            if (nsample>NSBL){
-                chdata->processPulseV1740(data->ts,NSBL,ledthr[data->b][chdata->ch],trig_pos,sampling_interval);
-            }
+//                }
+//                ispl++;
+//                if (ispl<nsample) {
+//                    WaveLine[ispl]=(gg[k]>>16)&0xFFFF;
+//                    chdata->pulse.push_back((gg[k]>>16)&0xFFFF);
+//                }
+//                ispl++;
+//                k++;
+//            }
+//            //!--------------------
+//            if (nsample>NSBL){
+//                chdata->processPulseV1740(data->ts,NSBL,ledthr[data->b][chdata->ch],trig_pos,sampling_interval);
+//            }
 
-            if (chdata->finets<min_finets&&chdata->finets>=0){
-                min_finets =chdata->finets;
-                ich_min_finets = i;
-            }
-            data->AddHit(chdata);
-        }//loop all channels
-        data->trig_ch = ich_min_finets;
+//            if (chdata->finets<min_finets&&chdata->finets>=0){
+//                min_finets =chdata->finets;
+//                ich_min_finets = i;
+//            }
+//            data->AddHit(chdata);
+//        }//loop all channels
+//        data->trig_ch = ich_min_finets;
 
-
-        if (data->board_fail_flag==1){
-            data_prev[data->b]->MergePulse(data,data_prev[data->b]->ts,NSBL,ledthr[data->b],trig_pos,sampling_interval);
-        }
-        //ProcessEvent(data);
-        //! process data
-        if (data_prev[data->b]->b!=-9){
-            if (data_prev[data->b]->board_fail_flag!=1)
-                ProcessEvent(data_prev[data->b]);
-        }
-        data_prev[data->b]->Clear();
-        data->Copy(*data_prev[data->b]);
-        //data_prev[data->b] = (NIGIRI*) data->Clone();
+//        if (data->board_fail_flag==1){
+//            data_prev[data->b]->MergePulse(data,data_prev[data->b]->ts,NSBL,ledthr[data->b],trig_pos,sampling_interval,N_MAX_WF_LENGTH);
+//        }
+//        //ProcessEvent(data);
+//        //! process data
+//        if (data_prev[data->b]->b>=0){
+//            if (data_prev[data->b]->board_fail_flag!=1)
+//                ProcessEvent(data_prev[data->b]);
+//            data_prev[data->b]->Clear();
+//        }
+//        data->Copy(*data_prev[data->b]);
+//        //data_prev[data->b] = (NIGIRI*) data->Clone();
     }
 }
 

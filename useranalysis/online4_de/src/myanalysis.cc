@@ -83,11 +83,11 @@ void Init(){
 }
 
 void ProcessEvent(NIGIRI* data_now){
-    if (data_now->b>0){
-        if (ts_prev[data_now->b]!=0&&data_now->ts<ts_prev[data_now->b])
-            cout<<"TIMESTAMP RESET at Board = "<<data_now->b<<": "<<ts_prev[data_now->b]<<" - "<<data_now->ts<<endl;
-        ts_prev[data_now->b] = data_now->ts;
-    }
+//    if (data_now->b>0){
+//        if (ts_prev[data_now->b]!=0&&data_now->ts<ts_prev[data_now->b])
+//            cout<<"TIMESTAMP RESET at Board = "<<data_now->b<<": "<<ts_prev[data_now->b]<<" - "<<data_now->ts<<endl;
+//        ts_prev[data_now->b] = data_now->ts;
+//    }
 
     if (data_now->b==10){
         //data_now->Print();
@@ -163,12 +163,12 @@ typedef enum{
 
 //! full map
 //#define N_PACKETMAP 16
-//const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,100,101,102,103};
-//const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
+//const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
+//const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
 
 #define N_PACKETMAP 16
 const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
-const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
+const pmap_decode packetdecode[]={NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,V1740ZSP,NONE,NONE,V1730DPPPHA,NONE};
 
 UShort_t ledthr[MAX_N_BOARD][V1740_N_MAX_CH];
 NIGIRI* data_prev[MAX_N_BOARD];
