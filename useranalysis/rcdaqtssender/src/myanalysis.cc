@@ -27,6 +27,8 @@
 #include <correlation.h>
 #include "TThread.h"
 
+#include "transfer.h"
+
 //#define SLOW_ONLINE 100000
 #define RATE_CAL_REFESH_SECONDS 10
 
@@ -39,45 +41,78 @@
 UShort_t trig_pos = N_MAX_WF_LENGTH*30/100;//unit of sample
 UShort_t sampling_interval = 16*8;//unit of ns
 
-
-ofstream outstr;
-
 TFile* file0 = 0;
 TTree* tree = 0;
 NIGIRI* data;
-
 int nevtt = 0;
 
-int nevtb[MAX_N_BOARD];
+struct stsyncdata{
+  unsigned int id;
+  unsigned int adc;
+  unsigned long long int ts;
+};
+int transid = 1; ///try exp 0;
+char *dataxfer;
+void *quit(void){
+  transferMultiClose(transid);
+  free(dataxfer);
+  exit(0);
+}
+const int buffersize = 16*1024;
+int dataxferidx;
+struct stsyncdata syncdata;
+int connection_status;
+int ts_cnt = 0;
 
 void Init(){
+    ts_cnt = 0;
+    dataxferidx=0;
+    connection_status=0;
 
-    for (Int_t i=0;i<MAX_N_BOARD;i++){
-        nevtb[i]=0;
+    syncdata.id = 2;
+    syncdata.adc = 0;
+    dataxfer = (char*) malloc(buffersize+32);
+    if(!dataxfer){
+      printf("Cannot' malloc sender data%d\n", buffersize);
+      exit(0);
     }
+    printf("rcdaqsender\n");
+    /* Signal */
+    //signal(SIGINT, (void *)quit);
+    transferMultiPort(transid, 10307);
+    transferMultiBlockSize(transid, buffersize);
+    if (transferMultiInit(transid, (char*)"10.32.0.53")==0) connection_status=1;
 }
 
 void ProcessEvent(NIGIRI* data_now){
-    if (data_now->b==6||data_now->b==7){
-    //if (data_now->b<11){
-        if (outstr.is_open())
-            outstr<<data_now->b<<"\t"<<data_now->ts<<endl;
-        else
-            cout<<data_now->b<<"\t"<<data_now->ts<<endl;
-        nevtb[data_now->b]++;
+    if (data_now->b==-1){
+        if (dataxferidx>=buffersize){
+            if (connection_status) transferMultiTxData(transid, &dataxfer[32], 1, buffersize-32);
+            //unsigned int ttt;
+            //memcpy((char *)&ttt, &dataxfer[32], sizeof(ttt));
+            //printf("data = %llu (buffersize=%d)\n", ttt, buffersize);
+            memset(dataxfer, 0, buffersize);
+            dataxferidx=0;
+        }
+        syncdata.ts = data_now->ts/LUPO_CLK_RES;
+        syncdata.ts = (syncdata.ts>>2) & 0x0000ffffffffffffLL;//Just equivalent to device by 4 (40 ns resolution)
+        if (ts_cnt%1000==0) //cout<<std::dec<<"ts = "<<data_now->ts<<" ns - transfered = 0x"<<std::hex<<syncdata.ts<<endl;
+            printf("current ts item = %llu, transfered = 0x%llx\n", data_now->ts,syncdata.ts);
+        memcpy(dataxfer+32+dataxferidx, (char *)&syncdata, sizeof(syncdata));
+        dataxferidx += sizeof(syncdata);
+
+        ts_cnt++;
     }
 }
 
 void DoUpdate(){
-
+    //pstatus();
 }
 
 void OpenFile(const char* filename){
-    char tmpfileout[200];
-    sprintf(tmpfileout,"%s.txt",filename);
-    outstr.open(tmpfileout,std::ofstream::out);
     file0 = new TFile(filename,"recreate");
     tree = new TTree("tree","tree");
+    //tree->Branch("data",&data_ich);
 }
 
 void CloseMe(){
@@ -112,7 +147,7 @@ typedef enum{
 
 #define N_PACKETMAP 16
 const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
-const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
+const pmap_decode packetdecode[]={LUPO,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE};
 
 UShort_t ledthr[MAX_N_BOARD][V1740_N_MAX_CH];
 NIGIRI* data_prev[MAX_N_BOARD];

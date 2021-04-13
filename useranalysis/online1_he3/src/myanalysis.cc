@@ -62,6 +62,62 @@ Long64_t pulser_tsend[V1740_N_MAX_CH*10];
 Long64_t pulser_npulses[V1740_N_MAX_CH*10];
 TH1F* tdiff[V1740_N_MAX_CH*10];
 
+
+TH2F* h2d_brikenhit;
+TRandom rr;
+void genRndCircle(Double_t &x,Double_t &y,Double_t a,Double_t b,Double_t xpos,Double_t ypos,Double_t R){
+    if (b<a){
+        Double_t temp=a;
+        a=b;
+        b=temp;
+    }
+    x=xpos+b*R*TMath::Cos(2*TMath::Pi()*a/b);
+    y=ypos+b*R*TMath::Sin(2*TMath::Pi()*a/b);
+}
+
+Double_t fHe3Id2posX[140];
+Double_t fHe3Id2posY[140];
+Double_t fHe3Id2posZ[140];
+Double_t fHe3Id2diameter[140];
+Double_t fHe3Id2ring[140];
+Double_t fHe3Id2length[140];
+Int_t id_map[20][V1740_N_MAX_CH];
+void ReadMapping(){
+    for (Int_t i=0;i<MAX_N_BOARD;i++){
+        for (Int_t j=0;j<V1740_N_MAX_CH;j++){
+            id_map[i][j] = -1;
+        }
+    }
+    std::ifstream inpf((char*)"He3_mapping.txt");
+    if (inpf.fail()){
+        cout<<"No BELEN Mapping file is given"<<endl;
+        return;
+    }
+    cout<<"Start reading BELEN Mapping file: He3_mapping.txt"<<endl;
+
+    Int_t id,index1,index2;
+    UShort_t ring;
+    Double_t x,y,z;
+    Double_t d,length;
+    Int_t mm=0;
+    while (inpf.good()){
+        inpf>>id>>index1>>index2>>d>>x>>y>>z>>ring>>length;
+        if (id<=500){//for he3
+            fHe3Id2posX[id]=x;
+            fHe3Id2posY[id]=y;
+            fHe3Id2posZ[id]=z;
+            fHe3Id2diameter[id]=d;
+            fHe3Id2ring[id]=ring;
+            fHe3Id2length[id]=length;
+            id_map[index1][index2] = id;
+        }
+        //cout<<He3id<<"-"<<daqId<<"-"<<d<<"-"<<x<<"-"<<y<<"-"<<z<<endl;
+        mm++;
+    }
+    cout<<"Read "<<mm<<" line"<<endl;
+    inpf.close();
+}
+
 void Init(){
     for (Int_t i=0;i<64*3;i++){
         pulser_tstart[i]=0;
@@ -76,6 +132,10 @@ void Init(){
 
         tdiff[i]=new TH1F(Form("htdiff%d",i),Form("htdiff%d",i),2000,0,1);
     }
+
+    h2d_brikenhit = new TH2F("h2d_brikenhit","h2d_brikenhit",400,-400,400,400,-400,400);
+    ReadMapping();
+
     hdeadtime = new TH1F("hdeadtime","hdeadtime",64*3,0,64*3);
     hrate = new TH1F("hrate","hrate",64*3,0,64*3);
     hrateupdate = new TH1F("hrateupdate","hrateupdate",64*3,0,64*3);
@@ -96,32 +156,35 @@ void ProcessEvent(NIGIRI* data_now){
         for (Int_t i=0;i<V1740_N_MAX_CH;i++){
             NIGIRIHit* hit=data_now->GetHit(i);
             Int_t ch = hit->ch+(data_now->b-8)*V1740_N_MAX_CH;
-
-            if (hit->clong>2000){
-                if (pulser_tstart[ch]==0) {
-                    pulser_tstart[ch] = hit->ts;
-                    pulser_evtstart[ch] = data->evt;
-                }else{
-                    if (data_now->evt-pulser_evtstart[ch]>2000){//skip first 2000 evt
-                        Double_t ts_diff = (Double_t)(hit->ts - pulser_tsend[ch])/1e9;
-                        if (ts_diff>1&&ch==85) cout<<data_now->evt<<endl;
-                        tdiff[ch]->Fill(ts_diff);
-                    }
-                    pulser_tsend[ch] = hit->ts;
-                }
-                pulser_npulses[ch]++;
-            }
-            Int_t itcnt= 0 ;
-            for (std::vector<UShort_t>::iterator it =hit->pulse.begin() ; it != hit->pulse.end(); ++it){
-                //if (itcnt<N_MAX_WF_LENGTH){
-                    hwf2d[ch]->Fill(itcnt,*it);
-                //}
-                itcnt++;
-            }
+//            Int_t itcnt= 0 ;
+//            for (std::vector<UShort_t>::iterator it =hit->pulse.begin() ; it != hit->pulse.end(); ++it){
+//                //if (itcnt<N_MAX_WF_LENGTH){
+//                    hwf2d[ch]->Fill(itcnt,*it);
+//                //}
+//                itcnt++;
+//            }
             if (hit->clong>0){
                 if (hit->clong>100) hrateupdate->Fill(ch);
                 he2d->Fill(ch,hit->clong);
-            }
+
+                //! hit distribution
+                Int_t ID = id_map[data_now->b][i];
+                if (ID>0){//draw 2d hist
+                    Double_t fposX = fHe3Id2posX[ID];
+                    Double_t fposY = fHe3Id2posY[ID];
+                    Double_t fposZ = fHe3Id2posZ[ID];
+                    //! pertubating
+                    Double_t a,b,x,y,r;
+                    r=fHe3Id2diameter[ID]/2;
+                    a=rr.Rndm();
+                    b=rr.Rndm();
+                    genRndCircle(x,y,a,b,fposX,fposY,r);
+                    fposX = x;
+                    fposY = y;
+                    fposZ = rr.Rndm()*fHe3Id2length[ID]+fposZ-fHe3Id2length[ID]/2;
+                    if (hit->clong>100) h2d_brikenhit->Fill(x,y,TMath::Pi()*r*r);
+                }
+            }//if clong>0;
         }
     }
 }

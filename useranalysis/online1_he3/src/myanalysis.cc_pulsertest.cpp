@@ -39,43 +39,102 @@
 UShort_t trig_pos = N_MAX_WF_LENGTH*30/100;//unit of sample
 UShort_t sampling_interval = 16*8;//unit of ns
 
-
-ofstream outstr;
-
 TFile* file0 = 0;
 TTree* tree = 0;
 NIGIRI* data;
 
-int nevtt = 0;
+TH2F* hwf2d[V1740_N_MAX_CH*10];
+TH1F* hrate;
+TH1F* hdeadtime;
+TH1F* hrateupdate;
 
-int nevtb[MAX_N_BOARD];
+TH2F* he2d;
+
+TH1F* he1d_clover[16];
+
+int nevt = 0;
+
+
+
+Long64_t pulser_tstart[V1740_N_MAX_CH*10];
+Long64_t pulser_evtstart[V1740_N_MAX_CH*10];
+Long64_t pulser_tsend[V1740_N_MAX_CH*10];
+Long64_t pulser_npulses[V1740_N_MAX_CH*10];
+TH1F* tdiff[V1740_N_MAX_CH*10];
 
 void Init(){
+    for (Int_t i=0;i<64*3;i++){
+        pulser_tstart[i]=0;
+        pulser_tsend[i]=0;
+        pulser_npulses[i]=0;
 
-    for (Int_t i=0;i<MAX_N_BOARD;i++){
-        nevtb[i]=0;
+        hwf2d[i]=new TH2F(Form("hwf2d%d",i),Form("hwf2d%d",i),300,0,300,500,0,4000);
+
+        if (i<16){
+            he1d_clover[i]=new TH1F(Form("he1d_clover%d",i),Form("he1d_clover%d",i),1000,0,40000);
+        }
+
+        tdiff[i]=new TH1F(Form("htdiff%d",i),Form("htdiff%d",i),2000,0,1);
     }
+    hdeadtime = new TH1F("hdeadtime","hdeadtime",64*3,0,64*3);
+    hrate = new TH1F("hrate","hrate",64*3,0,64*3);
+    hrateupdate = new TH1F("hrateupdate","hrateupdate",64*3,0,64*3);
+
+    he2d = new TH2F("he2d","he2d",64*3,0,64*3,2000,0,4000);
 }
 
 void ProcessEvent(NIGIRI* data_now){
-    if (data_now->b==6||data_now->b==7){
-    //if (data_now->b<11){
-        if (outstr.is_open())
-            outstr<<data_now->b<<"\t"<<data_now->ts<<endl;
-        else
-            cout<<data_now->b<<"\t"<<data_now->ts<<endl;
-        nevtb[data_now->b]++;
+    if (data_now->b==11){
+        if (data_now->GetHit(0)->clong>0)
+            he1d_clover[data_now->GetHit(0)->ch]->Fill(data_now->GetHit(0)->clong);
+    }
+    if (data_now->b<0){
+        //data_now->Print();
+    }
+    if (data_now->b==8||data_now->b==9||data_now->b==10){
+        //data_now->Print();
+        for (Int_t i=0;i<V1740_N_MAX_CH;i++){
+            NIGIRIHit* hit=data_now->GetHit(i);
+            Int_t ch = hit->ch+(data_now->b-8)*V1740_N_MAX_CH;
+
+            if (hit->clong>2000){
+                if (pulser_tstart[ch]==0) {
+                    pulser_tstart[ch] = hit->ts;
+                    pulser_evtstart[ch] = data->evt;
+                }else{
+                    if (data_now->evt-pulser_evtstart[ch]>2000){//skip first 2000 evt
+                        Double_t ts_diff = (Double_t)(hit->ts - pulser_tsend[ch])/1e9;
+                        if (ts_diff>1&&ch==85) cout<<data_now->evt<<endl;
+                        tdiff[ch]->Fill(ts_diff);
+                    }
+                    pulser_tsend[ch] = hit->ts;
+                }
+                pulser_npulses[ch]++;
+            }
+            Int_t itcnt= 0 ;
+            for (std::vector<UShort_t>::iterator it =hit->pulse.begin() ; it != hit->pulse.end(); ++it){
+                //if (itcnt<N_MAX_WF_LENGTH){
+                    hwf2d[ch]->Fill(itcnt,*it);
+                //}
+                itcnt++;
+            }
+            if (hit->clong>0){
+                if (hit->clong>100) hrateupdate->Fill(ch);
+                he2d->Fill(ch,hit->clong);
+            }
+        }
     }
 }
 
 void DoUpdate(){
-
+    for (Int_t i=0;i<hrateupdate->GetNbinsX();i++){
+        hrate->SetBinContent(i+1,hrateupdate->GetBinContent(i+1)/RATE_CAL_REFESH_SECONDS);
+    }
+    hrateupdate->Reset();
+    //pstatus();
 }
 
 void OpenFile(const char* filename){
-    char tmpfileout[200];
-    sprintf(tmpfileout,"%s.txt",filename);
-    outstr.open(tmpfileout,std::ofstream::out);
     file0 = new TFile(filename,"recreate");
     tree = new TTree("tree","tree");
 }
@@ -85,6 +144,13 @@ void CloseMe(){
         if (tree) tree->Write();
         file0->Close();
     }
+    for (Int_t i=0;i<64*3;i++){
+        Double_t tsgap = (Double_t)(pulser_tsend[i] - pulser_tstart[i]);
+        if (tsgap>0)
+            hdeadtime->SetBinContent(i+1,(Double_t)(pulser_npulses[i]-1)/tsgap*1e9);
+    }
+
+    cout<<nevt<<endl;
 }
 
 //!**************************************************
@@ -112,7 +178,7 @@ typedef enum{
 
 #define N_PACKETMAP 16
 const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
-const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
+const pmap_decode packetdecode[]={NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,V1740ZSP,V1740ZSP,NONE,NONE,NONE,NONE,NONE};
 
 UShort_t ledthr[MAX_N_BOARD][V1740_N_MAX_CH];
 NIGIRI* data_prev[MAX_N_BOARD];
@@ -205,63 +271,62 @@ void decodeV1740zsp(Packet* p1740zsp){
         data->Clear();
         int headaddr = k;
         data->DecodeHeaderZsp(&gg[k],p1740zsp->getHitFormat());
-        ProcessEvent(data);
-//        k+=V1740_HDR+V1740_N_MAX_CH;
-//        //! get number of channels from channel mask
-//        double min_finets = 99999;
-//        int ich_min_finets = -1;
-//        for (int i=0;i<V1740_N_MAX_CH;i++){
-//            int chgrp = i/8;
-//            if (((data->channel_mask>>chgrp)&0x1)==0) continue;
-//            //! header
-//            NIGIRIHit* chdata=new NIGIRIHit;
-//            chdata->ch = i;//for sorter
-//            int nsample = gg[headaddr+V1740_HDR+i];
-//            if (nsample>NSBL&&nsample<N_MAX_WF_LENGTH){
-//                data->board_fail_flag = 1;
-//            }
-//            chdata->nsample = nsample;
-//            UShort_t WaveLine[nsample];
-//            int ispl = 0;
-//            for (int j=0;j<nsample/2+nsample%2;j++){
-//                if (ispl<nsample) {
-//                    WaveLine[ispl]=gg[k]&0xFFFF;
-//                    chdata->pulse.push_back(gg[k]&0xFFFF);
+        k+=V1740_HDR+V1740_N_MAX_CH;
+        //! get number of channels from channel mask
+        double min_finets = 99999;
+        int ich_min_finets = -1;
+        for (int i=0;i<V1740_N_MAX_CH;i++){
+            int chgrp = i/8;
+            if (((data->channel_mask>>chgrp)&0x1)==0) continue;
+            //! header
+            NIGIRIHit* chdata=new NIGIRIHit;
+            chdata->ch = i;//for sorter
+            int nsample = gg[headaddr+V1740_HDR+i];
+            if (nsample>NSBL&&nsample<N_MAX_WF_LENGTH){
+                data->board_fail_flag = 1;
+            }
+            chdata->nsample = nsample;
+            UShort_t WaveLine[nsample];
+            int ispl = 0;
+            for (int j=0;j<nsample/2+nsample%2;j++){
+                if (ispl<nsample) {
+                    WaveLine[ispl]=gg[k]&0xFFFF;
+                    chdata->pulse.push_back(gg[k]&0xFFFF);
 
-//                }
-//                ispl++;
-//                if (ispl<nsample) {
-//                    WaveLine[ispl]=(gg[k]>>16)&0xFFFF;
-//                    chdata->pulse.push_back((gg[k]>>16)&0xFFFF);
-//                }
-//                ispl++;
-//                k++;
-//            }
-//            //!--------------------
-//            if (nsample>NSBL){
-//                chdata->processPulseV1740(data->ts,NSBL,ledthr[data->b][chdata->ch],trig_pos,sampling_interval);
-//            }
+                }
+                ispl++;
+                if (ispl<nsample) {
+                    WaveLine[ispl]=(gg[k]>>16)&0xFFFF;
+                    chdata->pulse.push_back((gg[k]>>16)&0xFFFF);
+                }
+                ispl++;
+                k++;
+            }
+            //!--------------------
+            if (nsample>NSBL){
+                chdata->processPulseV1740(data->ts,NSBL,ledthr[data->b][chdata->ch],trig_pos,sampling_interval);
+            }
 
-//            if (chdata->finets<min_finets&&chdata->finets>=0){
-//                min_finets =chdata->finets;
-//                ich_min_finets = i;
-//            }
-//            data->AddHit(chdata);
-//        }//loop all channels
-//        data->trig_ch = ich_min_finets;
+            if (chdata->finets<min_finets&&chdata->finets>=0){
+                min_finets =chdata->finets;
+                ich_min_finets = i;
+            }
+            data->AddHit(chdata);
+        }//loop all channels
+        data->trig_ch = ich_min_finets;
 
-//        if (data->board_fail_flag==1){
-//            data_prev[data->b]->MergePulse(data,data_prev[data->b]->ts,NSBL,ledthr[data->b],trig_pos,sampling_interval,N_MAX_WF_LENGTH);
-//        }
-//        //ProcessEvent(data);
-//        //! process data
-//        if (data_prev[data->b]->b>=0){
-//            if (data_prev[data->b]->board_fail_flag!=1)
-//                ProcessEvent(data_prev[data->b]);
-//            data_prev[data->b]->Clear();
-//        }
-//        data->Copy(*data_prev[data->b]);
-//        //data_prev[data->b] = (NIGIRI*) data->Clone();
+        if (data->board_fail_flag==1){
+            data_prev[data->b]->MergePulse(data,data_prev[data->b]->ts,NSBL,ledthr[data->b],trig_pos,sampling_interval,N_MAX_WF_LENGTH);
+        }
+        //ProcessEvent(data);
+        //! process data
+        if (data_prev[data->b]->b>=0){
+            if (data_prev[data->b]->board_fail_flag!=1)
+                ProcessEvent(data_prev[data->b]);
+            data_prev[data->b]->Clear();
+        }
+        data->Copy(*data_prev[data->b]);
+        //data_prev[data->b] = (NIGIRI*) data->Clone();
     }
 }
 
@@ -396,7 +461,7 @@ void decodelupo(Packet* pLUPO){
 
 int process_event (Event * e)
 {
-    nevtt++;
+    nevt++;
 //    time_t tevt =e->getTime();
 //    cout<<"***************** Eventpacket number  = "<<e->getEvtSequence()<<" / record date time"<<asctime(gmtime(&tevt))<<"***************\n"<<endl;
     Packet *pmap[N_PACKETMAP];
@@ -423,6 +488,7 @@ int process_event (Event * e)
     return 0;
 }
 int pclose(){
+    cout<<"Closing"<<endl;
     CloseMe();
     return 0;
 }
