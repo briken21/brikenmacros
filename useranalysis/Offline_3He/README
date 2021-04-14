@@ -23,4 +23,4 @@ OfflineConf_Data08Apr2021:
 IMPORTANT: This file is a reconstruction. We had no information of the setup. Some elements can be WRONG.
 The third set of data available. It combines 3 V1730 and 1 V1740.
 The digitizers V1730 have connected the 3He 1-48. 16 channels each.
-The digitizer V1740 has connected the 3He 65-127.// myanalysis_MP_V1730_V1740.cc
+The digitizer V1740 has connected the 3He 65-127.
