@@ -1,4 +1,9 @@
-
+// myanalysis_MP_V1730_V1740.cc
+// This code is the Offline analysis for the BRIKEN detector.
+// Input: evt file from digitizers V1730 and V1740.
+// It looks for a configuration file called OfflineConf.csv in the same directory this code is.
+// IMPORTANT: Check the PACKETMAP ZONE defined in this code and define the correct map for each set of files.
+// Output: Root file with a tree called BRIKENTree (TimeStamps,Energy,Id,...).
 /* ************************ DO NOT REMOVE  ****************************** */
 #include <iostream>
 #include <pmonitor/pmonitor.h>
@@ -60,6 +65,15 @@ BrikenTreeData    ToAncFill;
 TBranch *NeutronsBranch;
 TBranch *GammaBranch;
 TBranch *AncillaryBranch;
+//BrikenTreeData magnitudes
+// E -> energy
+// T -> TimeStamps
+// Id -> Detector numeration
+// type -> Group of detectors associated to each branch ( (1)Neutron, (2)Gamma, (3)Ancillary )
+// Index1 -> Number of ring
+// Index2 -> Dummy
+// InfoFlag -> Dummy
+// Name -> Name of the detector
 
 std::multimap<uint64_t,BrikenTreeData> DataMapBRIKEN;
 
@@ -102,6 +116,7 @@ void ProcessEvent(NIGIRI* data_now){
     tree->Fill();
 }
 
+// Function to sort the timestamps, the associated magnitudes and fill the BRIKENTree.
 void ProcessEvent_BRIKENTree_Organized(std::multimap<uint64_t,BrikenTreeData> DataMap){
 
   ToNeuFill.Clear();
@@ -125,6 +140,7 @@ void ProcessEvent_BRIKENTree_Organized(std::multimap<uint64_t,BrikenTreeData> Da
   }
 }
 
+// Function to read the configuration file and fill vectors to use them later.
 void ConfigurationFile_Reader(){
 
    string FileName="OfflineConf.csv";
@@ -175,14 +191,7 @@ void DoUpdate(){
     pstatus();
 }
 
-/*
-void OpenFile(const char* filename){
-    file0 = new TFile(filename,"recreate");
-    tree = new TTree("tree","tree");
-    tree->Branch("data",&treedata);
-}
-*/
-
+// Open the root file, create the Tree and read the configuration file.
 void OpenFile(const char* filename){
 
   file0 = new TFile(filename,"recreate");
@@ -198,17 +207,15 @@ void OpenFile(const char* filename){
 
 }
 
+// End the program.  Fill the BRIKENTree and store it in a root file. Also print the proportion of counts with repeated time stamp.
 void CloseMe(){
   ProcessEvent_BRIKENTree_Organized(DataMapBRIKEN);
-  cout << "Count_RepeatTime:  " << Count_RepeatTime << endl;
-  cout << "Count_RepeatTime_Neutron:  " << Count_RepeatTime_Neutron << endl;
   cout << "Count_RepeatTime/Total(%):  " << float(Count_RepeatTime)/float(nevt)*100. << endl;
-  cout << "Count_RepeatTime_Neutron/Total(%):  " << float(Count_RepeatTime_Neutron)/float(nevt_neutrons)*100. << endl;
+  cout << "Count_RepeatTime_NeutronRegion/Total_NeutronRegion(%):  " << float(Count_RepeatTime_Neutron)/float(nevt_neutrons)*100. << endl;
 
   if (file0) {
     if (tree) tree->Write();
     if (BRIKENTree) BRIKENTree->Write();
-    cout << "It works!" << endl;
     file0->Close();
   }
   cout<< "Number of events: " << nevt <<endl;
@@ -230,17 +237,23 @@ typedef enum{
     V1730DPPPHA = 4,
 }pmap_decode;
 
+//*****************************************************************************************************************************************************************************************
+// PACKETMAP ZONE. This maps indicate the structure of digitaizer used in the measure.
+// If these vectors are not well set the program won't work.
+
 //#define N_PACKETMAP 14
 //const int packetmap[]={50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
 //const pmap_decode packetdecode[]={V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
 
-#define N_PACKETMAP 10
-const int packetmap[]={50,51,52,53,54,55,56,57,58,59,60,100};
-const pmap_decode packetdecode[]={NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA};
+//#define N_PACKETMAP 10
+//const int packetmap[]={50,51,52,53,54,55,56,57,58,59,60,100};
+//const pmap_decode packetdecode[]={NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA};
 
-//#define N_PACKETMAP 16
-//const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
-//const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
+#define N_PACKETMAP 16
+const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
+const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
+//*****************************************************************************************************************************************************************************************
+
 
 UShort_t ledthr[MAX_N_BOARD][V1740_N_MAX_CH];
 NIGIRI* data_prev[MAX_N_BOARD];
@@ -353,24 +366,13 @@ void BRIKENTree_Construction(NIGIRI* treeModule, int BoardNumber){
       nevt++;
       if (data_BRIKEN.E>150 && data_BRIKEN.E<820)nevt_neutrons++;
 
-
-      if ( data_BRIKEN.T == Last_Timestamp ){
-/*        cout << "*********************************************************************" << endl;
-
-        cout << "REPEATED TIME STAMP:  " << endl;
-        cout << "data_prev[" << Last_Module << "]->fhits.at(" << Last_Channel << ")->ts:  " << Last_Timestamp << endl;
-        cout << "data_prev[" << Last_Module << "]->fhits.at(" << Last_Channel << ")->clong:  " << Last_Energy << endl;
-        cout << "data_prev[" << data->b << "]->fhits.at(" << irn << ")->ts:  " << data_prev[data->b]->fhits.at(irn)->ts << endl;
-        cout << "data_prev[" << data->b << "]->fhits.at(" << irn << ")->clong:  " << data_prev[data->b]->fhits.at(irn)->clong << endl;
-*/
+      if ( data_BRIKEN.T == Last_Timestamp && (data_BRIKEN.E<900 || Last_Energy<900) ){
         Count_RepeatTime++;
         if (data_BRIKEN.E>150 && data_BRIKEN.E<820)Count_RepeatTime_Neutron++;
       }
 
       Last_Timestamp = data_BRIKEN.T;
       Last_Energy = data_BRIKEN.E;
-      Last_Channel = IdChannel_Trigger;
-
     }
   }
 }
@@ -588,6 +590,13 @@ void decodeV1730dpppha(Packet* p1730dpppha){
                   DataMapBRIKEN.emplace(data_BRIKEN.T,data_BRIKEN);
                   nevt++;
                   if (data_BRIKEN.E>150 && data_BRIKEN.E<820)nevt_neutrons++;
+
+                  if ( data_BRIKEN.T == Last_Timestamp && (data_BRIKEN.E<900 || Last_Energy<900) ){
+                    Count_RepeatTime++;
+                    if (data_BRIKEN.E>150 && data_BRIKEN.E<820)Count_RepeatTime_Neutron++;
+                  }
+                  Last_Timestamp = data_BRIKEN.T;
+                  Last_Energy = data_BRIKEN.E;
 
                 }
             }//loop on channel data
