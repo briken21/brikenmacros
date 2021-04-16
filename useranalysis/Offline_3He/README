@@ -10,6 +10,7 @@ Output: Root file with a tree called BRIKENTree (TimeStamps,Energy,Id,...).
 
 To run this code, REPLACE the code myanalysis.cc from the src/ directory. Only one file that does the analysis can be placed in the directory.
 In that directory, the cmake looks for the .cc files. For that reason, this script can be named whatever you want if the extension is .cc.
+Also it is necessary to REPLACE libDataStruct.h located in include/ directory. This changes is required to have the exact same Tree from 2017.
 
 
 The configuration files in this directory:
