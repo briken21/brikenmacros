@@ -17,7 +17,7 @@ cd build_onlinelib
 3) Then we run the cmake (or cmake3): cmake -DCMAKE_INSTALL_PREFIX=/path/to/installation_dir /path/to/brikenmacros/onlinelib.
 
 I decided to create the installation directory inside the brikenmacros directory. So the command in my PC should be:
-cmake3 -DCMAKE_INSTALL_PREFIX=/home/maxpallas/data/briken2021/brikenmacros/OnlineLibraries_Test ../
+cmake3 -DCMAKE_INSTALL_PREFIX=/home/maxpallas/data/briken2021/OnlineLibraries ../
 NOTE: Some errors related to Boost and cppzmq appear but you can ignore them.
 
 make install
