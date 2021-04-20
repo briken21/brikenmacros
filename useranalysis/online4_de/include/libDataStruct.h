@@ -25,6 +25,26 @@ using namespace std;
 #include <TFile.h>
 #include <string.h>
 
+class de_data  {
+public:
+   de_data() {
+       for (int i=0;i<16;i++){
+           ch[i]=i;
+       }
+   }
+   ~de_data() {}
+   void Clear(){
+       for (int i=0;i<16;i++){
+           el[i]=0;
+           eh[i]=0;
+       }
+   };
+   long long ts;
+   double el[16];
+   double eh[16];
+   int ch[16];
+};
+
 class BrikenTreeData  {
 public:
    BrikenTreeData() { }

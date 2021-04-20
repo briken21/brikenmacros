@@ -37,11 +37,12 @@
 #define NSBL 8
 #define N_MAX_WF_LENGTH 90
 UShort_t trig_pos = N_MAX_WF_LENGTH*30/100;//unit of sample
-UShort_t sampling_interval = 16*8;//unit of ns
+UShort_t sampling_interval = 16*16;//unit of ns
 
 TFile* file0 = 0;
 TTree* tree = 0;
 NIGIRI* data;
+de_data* treedata;
 
 TH2F* hwf2d[V1740_N_MAX_CH*10];
 TH1F* hrate;
@@ -50,88 +51,91 @@ TH1F* hrateupdate;
 TH2F* he2d;
 TH2F* hit2d[8];
 
+TH1F* hdepth;
+
 TH1F* he1d_clover[16];
 
 ULong64_t ts_prev[MAX_N_BOARD];
+ULong64_t ts_ratecal[MAX_N_BOARD];
 
 int nevt = 0;
 
 void Init(){
-    for (Int_t i=0;i<V1740_N_MAX_CH*8;i++){
+    for (Int_t i=0;i<V1740_N_MAX_CH;i++){
         hwf2d[i]=new TH2F(Form("hwf2d%d",i),Form("hwf2d%d",i),300,0,300,500,0,5000);
 
         if (i<16){
             he1d_clover[i]=new TH1F(Form("he1d_clover%d",i),Form("he1d_clover%d",i),1000,0,40000);
         }
     }
-    for (Int_t i=0;i<4;i++)
-        hit2d[i] = new TH2F(Form("hit2d_%d",i),Form("hit2d_%d",i),32,0,32,32,0,32);
 
+    hdepth = new TH1F("hdepth","hdepth",11,0,11);
     hrate = new TH1F("hrate","hrate",V1740_N_MAX_CH*8,0,V1740_N_MAX_CH*8);
     hrateupdate = new TH1F("hrateupdate","hrateupdate",64*3,0,64*3);
 
-    he2d = new TH2F("he2d","he2d",V1740_N_MAX_CH*8,0,V1740_N_MAX_CH*8,2500,0,5000);
+    he2d = new TH2F("he2d","he2d",V1740_N_MAX_CH,0,V1740_N_MAX_CH,2500,0,5000);
+
     for (Int_t i=0;i<MAX_N_BOARD;i++){
         ts_prev[i]=0;
+        ts_ratecal[i]=0;
     }
+    treedata =new de_data;
 }
 
 void ProcessEvent(NIGIRI* data_now){
-    if (ts_prev[data_now->b]!=0&&data_now->ts<ts_prev[data_now->b])
-        cout<<"TIMESTAMP RESET at Board = "<<data_now->b<<": "<<ts_prev[data_now->b]<<" - "<<data_now->ts<<endl;
-    ts_prev[data_now->b] = data_now->ts;
-
-//    if (data_now->b<8&&data_now->b>=0){
-//        Int_t xmax=0,ymax=0;
-//        Int_t exmax=0,eymax=0;
-//        Double_t esumx = 0;
-//        Double_t esumy = 0;
-//        Int_t dssdno = data_now->b;
-//        //data_now->Print();
-//        for (Int_t i=0;i<V1740_N_MAX_CH;i++){
-//            NIGIRIHit* hit=data_now->GetHit(i);
-//            Int_t ch = hit->ch + data_now->b*V1740_N_MAX_CH;
-//            Int_t itcnt= 0 ;
-//            if (hit->clong>0){
-//                if (hit->clong>100) hrateupdate->Fill(ch);
-//                for (std::vector<UShort_t>::iterator it =hit->pulse.begin() ; it != hit->pulse.end(); ++it){
-//                    //if (itcnt<N_MAX_WF_LENGTH){
-//                        hwf2d[ch]->Fill(itcnt,*it);
-//                    //}
-//                    itcnt++;
-//                }
-////                if (i<32){//X strips
-////                    if (hit->clong>exmax) {
-////                        exmax = hit->clong;
-////                        xmax = i;
-////                    }
-////                    esumx+=hit->clong;
-////                }else{//Y strips
-////                    if (hit->clong>eymax) {
-////                        eymax = hit->clong;
-////                        ymax = i-32;
-////                    }
-////                    esumy+=hit->clong;
-////                }
-//                he2d->Fill(ch,hit->clong);
-//            }
-//        }
-//        //if (esumx>0&&esumy>0) hit2d[dssdno]->Fill(xmax,ymax);
+//    if (data_now->b>0){
+//        if (ts_prev[data_now->b]!=0&&data_now->ts<ts_prev[data_now->b])
+//            cout<<"TIMESTAMP RESET at Board = "<<data_now->b<<": "<<ts_prev[data_now->b]<<" - "<<data_now->ts<<endl;
+//        ts_prev[data_now->b] = data_now->ts;
 //    }
+
+    if (data_now->b==10){
+        //data_now->Print();
+        treedata->Clear();
+        treedata->ts = data_now->ts;
+        for (Int_t i=0;i<V1740_N_MAX_CH;i++){
+            NIGIRIHit* hit=data_now->GetHit(i);
+            Int_t ch = hit->ch;
+            Int_t itcnt= 0 ;
+            for (std::vector<UShort_t>::iterator it =hit->pulse.begin() ; it != hit->pulse.end(); ++it){
+                //if (itcnt<N_MAX_WF_LENGTH){
+                    hwf2d[ch]->Fill(itcnt,*it);
+                //}
+                itcnt++;
+            }
+            if (hit->clong>0){
+                if (ch>31&&ch<48){//high gain
+                    treedata->eh[ch-32]=hit->clong;
+                }
+                if (ch>47&&ch<64){//low gain
+                    if (hit->clong>100) hdepth->Fill(ch-48);
+                    treedata->el[ch-48]=hit->clong;
+                }
+                hrateupdate->Fill(ch);
+
+//                }
+                he2d->Fill(ch,hit->clong);
+            }
+        }
+        tree->Fill();
+    }
 
 }
 
 void DoUpdate(){
+    Double_t tdiff=(Double_t)(ts_prev[9]-ts_ratecal[9])/1e9;
     for (Int_t i=0;i<hrateupdate->GetNbinsX();i++){
-        hrate->SetBinContent(i+1,hrateupdate->GetBinContent(i+1)/RATE_CAL_REFESH_SECONDS);
+        hrate->SetBinContent(i+1,hrateupdate->GetBinContent(i+1)/tdiff);
     }
+    ts_ratecal[9] = ts_prev[9];//should be a for loop of all board, but Ok for now
     hrateupdate->Reset();
     //pstatus();
 }
 
 void OpenFile(const char* filename){
-    file0 = new TFile(filename,"recreate");
+    //file0 = new TFile(filename,"recreate");
     tree = new TTree("tree","tree");
+    tree->Branch("data",&treedata);
 }
 
 void CloseMe(){
@@ -149,7 +153,6 @@ void CloseMe(){
 //! parameters for decoding V1740 zerosuppression
 #define V1740_HDR 6
 
-//! packet map
 typedef enum{
     NONE = 0,
     LUPO = 1,
@@ -165,7 +168,7 @@ typedef enum{
 
 #define N_PACKETMAP 16
 const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
-const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
+const pmap_decode packetdecode[]={NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,V1740ZSP,NONE,NONE,V1730DPPPHA,NONE};
 
 UShort_t ledthr[MAX_N_BOARD][V1740_N_MAX_CH];
 NIGIRI* data_prev[MAX_N_BOARD];
@@ -211,7 +214,7 @@ int pinit()
   for (Int_t i=0;i<MAX_N_BOARD;i++){
       data_prev[i]=new NIGIRI;
       for (Int_t j=0;j<V1740_N_MAX_CH;j++){
-          ledthr[i][j]=1550;
+          ledthr[i][j]=650;
       }
   }
 

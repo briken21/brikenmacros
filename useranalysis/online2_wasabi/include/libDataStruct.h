@@ -11,7 +11,7 @@
 #define TDC_MAX_MULT 3
 
 
-#define V1740_DGTZ_CLK_RES 8
+#define V1740_DGTZ_CLK_RES 10
 #define V1730_DGTZ_CLK_RES 2
 #define LUPO_CLK_RES 10
 
@@ -176,7 +176,7 @@ public:
 
         ts = 0;
         evt = 0;
-        b = -1;
+        b = -9;
         fmult = 0;
         for (size_t idx=0;idx<fhits.size();idx++){
             delete fhits[idx];
@@ -222,8 +222,12 @@ public:
         ts = ((unsigned long long)pattern)<<32|(unsigned long long)trigger_time_tag;
         ts = ts*V1740_DGTZ_CLK_RES;
     }
-    void MergePulse(NIGIRI* data,ULong64_t boardts, Int_t nsbl, UShort_t* ledthr,UShort_t trig_pos_in, UShort_t sampling_interval_in){
+    void MergePulse(NIGIRI* data,ULong64_t boardts, Int_t nsbl, UShort_t* ledthr,UShort_t trig_pos_in, UShort_t sampling_interval_in,UShort_t recordlength){
         for (Int_t i=0;i<fmult;i++){
+            if (GetHit(i)->nsample == nsbl){
+                for (int j=nsbl;j<recordlength;j++)
+                    GetHit(i)->pulse.push_back(GetHit(i)->pulse[nsbl-1]);//extend pulse from last items
+            }
             GetHit(i)->nsample = GetHit(i)->pulse.size()+data->GetHit(i)->pulse.size();
             GetHit(i)->pulse.insert(std::end(GetHit(i)->pulse),std::begin(data->GetHit(i)->pulse),std::end(data->GetHit(i)->pulse));
             GetHit(i)->processPulseV1740(boardts,nsbl,ledthr[i],trig_pos_in,sampling_interval_in);
