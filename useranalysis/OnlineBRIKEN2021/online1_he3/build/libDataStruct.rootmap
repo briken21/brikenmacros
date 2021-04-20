@@ -1,6 +1,0 @@
-[ libDataStruct.so ]
-# List of selected classes
-class BrikenTreeData
-class NIGIRI
-class NIGIRIHit
-header libDataStruct.h
