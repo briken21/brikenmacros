@@ -66,6 +66,8 @@ protected:
   struct sockaddr_in server;
   int _defunct;
 
+  bool iszmqmultpart;
+
 };
 
 #endif /* __RCDAQEVENTITERATOR_H__ */

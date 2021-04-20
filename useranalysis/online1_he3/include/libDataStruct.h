@@ -11,7 +11,7 @@
 #define TDC_MAX_MULT 3
 
 
-#define V1740_DGTZ_CLK_RES 10
+#define V1740_DGTZ_CLK_RES 8
 #define V1730_DGTZ_CLK_RES 2
 #define LUPO_CLK_RES 10
 

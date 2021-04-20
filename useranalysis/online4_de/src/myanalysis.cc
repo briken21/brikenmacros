@@ -133,7 +133,7 @@ void DoUpdate(){
 }
 
 void OpenFile(const char* filename){
-    //file0 = new TFile(filename,"recreate");
+    file0 = new TFile(filename,"recreate");
     tree = new TTree("tree","tree");
     tree->Branch("data",&treedata);
 }

@@ -40,6 +40,7 @@ UShort_t trig_pos = N_MAX_WF_LENGTH*30/100;//unit of sample
 UShort_t sampling_interval = 16*8;//unit of ns
 
 
+
 ofstream outstr;
 
 TFile* file0 = 0;
@@ -48,23 +49,92 @@ NIGIRI* data;
 
 int nevtt = 0;
 
+//Correlation map
+#define MAX_MAP_LENGTH 2000
+#define MAX_N_CORR_MAPS 15
+
+std::multimap <ULong64_t,UChar_t> datamap_lupo; //! sort by timestamp
+std::multimap <ULong64_t,UChar_t> datamap_dgtz[MAX_N_CORR_MAPS]; //! sort by timestamp
+std::multimap<ULong64_t,UChar_t>::iterator it_datamap_lupo;
+std::multimap<ULong64_t,UChar_t>::iterator it_datamap_dgtz[MAX_N_CORR_MAPS];
+
+Int_t nlupo;
+Int_t ncorr[MAX_N_CORR_MAPS];
+Int_t bmap[]= {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14};
+Long64_t tcorroffsets[MAX_N_CORR_MAPS];
+Long64_t lowerbound[] = {12000,12000,12000,12000,12000,12000,12000,12000,12000,12000,12000,12000,12000,12000,12000};
+Long64_t upperbound[] = {12000,12000,12000,12000,12000,12000,12000,12000,12000,12000,12000,12000,12000,12000,12000};
+TH1F* hlupodgtz[MAX_N_CORR_MAPS];
+TH1F* hlupodgtz_single;
+
 int nevtb[MAX_N_BOARD];
+
+ULong64_t ts_prev[MAX_N_BOARD];
+
+TCanvas* c1;
 
 void Init(){
 
     for (Int_t i=0;i<MAX_N_BOARD;i++){
-        nevtb[i]=0;
+        nevtb[i] = 0;
+        ts_prev[i] = 0;
+        tcorroffsets[i] = -i*1000;
     }
+
+    c1=new TCanvas("c1","c1",900,700);
+
+    nlupo = 0;
+    for (Int_t i=0;i<MAX_N_CORR_MAPS;i++){
+        ncorr[i] = 0;
+        hlupodgtz[i] = new TH1F(Form("hlupodgtz%d",i),Form("hlupodgtz%d",i),2000,-12000,12000);
+    }
+    hlupodgtz_single = new TH1F("hcorr","hcorr",2000,-12000,12000);
+    hlupodgtz_single->Draw();
+    pupdate(c1,2);
 }
 
 void ProcessEvent(NIGIRI* data_now){
-    if (data_now->b==6||data_now->b==7){
-    //if (data_now->b<11){
-        if (outstr.is_open())
-            outstr<<data_now->b<<"\t"<<data_now->ts<<endl;
-        else
-            cout<<data_now->b<<"\t"<<data_now->ts<<endl;
-        nevtb[data_now->b]++;
+    if (datamap_lupo.size()>MAX_MAP_LENGTH){
+        for (it_datamap_lupo=datamap_lupo.begin();it_datamap_lupo!=datamap_lupo.end();it_datamap_lupo++){
+            Long64_t ts=(Long64_t)it_datamap_lupo->first;
+            Long64_t corrts = 0;
+
+            for (Int_t i=0;i<MAX_N_CORR_MAPS;i++){
+                Long64_t ts1 = ts - lowerbound[i];
+                ULong64_t ts2 = ts + upperbound[i];
+                it_datamap_dgtz[i] = datamap_dgtz[i].lower_bound(ts1);
+                while(it_datamap_dgtz[i]!=datamap_dgtz[i].end()&&it_datamap_dgtz[i]->first<ts2){
+                    corrts = (Long64_t) it_datamap_dgtz[i]->first;
+                    hlupodgtz[i]->Fill(corrts-ts);
+                    hlupodgtz_single->Fill(corrts-ts+tcorroffsets[i]);
+                    ncorr[i]++;
+                    break;
+                }
+            }
+        }
+        //cout<<"Fill data, current LUPO = "<<data_now->ts<<endl;
+        datamap_lupo.clear();
+        for (Int_t i=0;i<MAX_N_CORR_MAPS;i++){
+            datamap_dgtz[i].clear();
+        }
+    }
+    if (data_now->b<0){
+      //cout<<"LUPO = "<<data_now->ts<<endl;
+        datamap_lupo.insert(make_pair(data_now->ts,data_now->b));
+    }else{
+        if (data_now->b<MAX_N_CORR_MAPS){
+            if (bmap[data_now->b]>=0){
+          //if (data_now->b==9) cout<<data_now->b<<"-"<<data_now->ts<<endl;
+                if (data_now->ts<ts_prev[data_now->b])
+                    cout<<"TS reset on board" <<data_now->b<<", tsnow = "<<data_now->ts<<" tsprev="<<ts_prev[data_now->b]<<endl;
+
+                ts_prev[data_now->b]=data_now->ts;
+                datamap_dgtz[bmap[data_now->b]].insert(make_pair(data_now->ts,data_now->b));
+            }
+        }
+//        else{
+//            if (data_now->b==8||data_now->b==9||data_now->b==10)cout<<data_now->b<<"\t"<<data_now->ts<<endl;
+//        }
     }
 }
 
@@ -85,6 +155,11 @@ void CloseMe(){
         if (tree) tree->Write();
         file0->Close();
     }
+    for (Int_t i=0;i<MAX_N_CORR_MAPS;i++){
+        ncorr[i] = 0;
+        hlupodgtz[i]->Reset();
+    }
+    cout<<"Clear histograms!"<<endl;
 }
 
 //!**************************************************
@@ -110,9 +185,9 @@ typedef enum{
 //const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
 //const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
 
-#define N_PACKETMAP 16
-const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
-const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
+#define N_PACKETMAP 17
+const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,61,100,101,102,103};
+const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
 
 UShort_t ledthr[MAX_N_BOARD][V1740_N_MAX_CH];
 NIGIRI* data_prev[MAX_N_BOARD];
@@ -278,7 +353,7 @@ void decodeV1730dpppha(Packet* p1730dpppha){
     while (pos<totalsize){
         //! board aggr
         //! check if we have valid datum
-        if ((words[pos]&0xF0000000)!=0xA0000000) cout<<"Error decoding V1730DPPPHA!"<<endl;
+        if ((words[pos]&0xF0000000)!=0xA0000000) cout<<"Error decoding V1730DPPPHA!, board number = "<<p1730dpppha->getHitFormat()<<endl;
         boardaggr.size = (words[pos]&0xFFFFFFF);
         boardaggr.board_id = (words[pos+1]&0xF8000000)>>27;
         boardaggr.board_fail_flag = (bool)((words[pos+1]&0x4000000)>>26);

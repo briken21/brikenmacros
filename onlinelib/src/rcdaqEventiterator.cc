@@ -105,6 +105,37 @@ int rcdaqEventiterator::setup(const char *ip, int &status)
   ctx = new zmq::context_t;
   //  Prepare subscriber
   online = new zmq::socket_t(*ctx, zmq::socket_type::sub);
+
+  if ( getenv("ZMQSUBSCRIBEMASK")){
+      int subscribe_mask = atoi(getenv("ZMQSUBSCRIBEMASK"));
+      for (short i=0;i<10;i++){
+          if (((subscribe_mask>>i)&0x1)==1){
+              char subval[2];
+              sprintf(subval,"M%d",i);
+              online->set(zmq::sockopt::subscribe, subval);
+              cout<<"Subcribed to "<<subval<<endl;
+          }
+      }
+  }else{
+      online->set(zmq::sockopt::subscribe, "");//subcribe all
+  }
+  int zmqhwm = 20;//default val
+  if ( getenv("ZMQHWM")){
+      zmqhwm = atoi(getenv("ZMQHWM"));
+  }
+  std::cout<<"ZMQ RECV HWM = "<<zmqhwm<<std::endl;
+  //! set high water mark that drop message in queue
+  if (zmqhwm>0)
+      online->set(zmq::sockopt::rcvhwm,zmqhwm);
+  else if (zmqhwm==-1)
+      online->set(zmq::sockopt::conflate,1);
+
+  iszmqmultpart = true;
+  if ( getenv("ZMQNOMULTPART")){
+      printf("ZMQ single message mode enabled\n");
+      iszmqmultpart = false;
+  }
+
   char tmpcmd[500];
   if (strcmp(ip,"")==0){
       sprintf(tmpcmd,"tcp://localhost:%d",MONITORINGPORTZMQ);
@@ -112,16 +143,6 @@ int rcdaqEventiterator::setup(const char *ip, int &status)
       sprintf(tmpcmd,"tcp://%s:%d",ip,MONITORINGPORTZMQ);
   }
   std::cout<<"ZMQ connected "<<tmpcmd<<std::endl;
-
-  online->set(zmq::sockopt::subscribe, "");//subcribe all
-  //! only get last mess from queue
-  online->set(zmq::sockopt::conflate,1);
-  //online->set(zmq::sockopt::rcvhwm,10);
-  //  int hmw =2;
-  //  online->setsockopt(ZMQ_RCVHWM,&hmw, sizeof(hmw));
-  //  int bufsize = hmw*1024;
-  //  online->setsockopt(ZMQ_RCVBUF,&bufsize, sizeof(bufsize));
-
   online->connect(tmpcmd);
 
 
@@ -232,19 +253,24 @@ int rcdaqEventiterator::read_next_buffer()
     }
 
   //! multi part get
-  //std::vector<zmq::message_t> recv_msgs;
-  //zmq::recv_result_t result =
-  //        zmq::recv_multipart(*online, std::back_inserter(recv_msgs));
-  //assert(result && "recv failed");
-  //int id = atoi(recv_msgs[0].to_string().erase(0,1).data());
-  //int* reportbufferno = (int*) recv_msgs[1].data();
-  //int* reportsize = (int*) recv_msgs[2].data();
-  //buffer_size = recv_msgs[3].size();//buffer size raw
-
+  std::vector<zmq::message_t> recv_msgs;
   //! single part get
   zmq::message_t mess;
-  auto res = online->recv(mess,zmq::recv_flags::none);
-  buffer_size = mess.size();
+
+  if (iszmqmultpart){
+      zmq::recv_result_t result =
+              zmq::recv_multipart(*online, std::back_inserter(recv_msgs));
+      //assert(result && "recv failed");
+      //int id = atoi(recv_msgs[0].to_string().erase(0,1).data());
+      //int* reportbufferno = (int*) recv_msgs[1].data();
+      //int* reportsize = (int*) recv_msgs[2].data();
+      buffer_size = recv_msgs[3].size();//buffer size raw
+  }else{
+      auto res = online->recv(mess,zmq::recv_flags::none);
+      buffer_size = mess.size();
+  }
+
+
 
   //! allocate PHDWORD bp
   int i;
@@ -265,8 +291,10 @@ int rcdaqEventiterator::read_next_buffer()
       bp = new PHDWORD[allocatedsize];
     }
   // not nice but Ok for now
-  //memcpy(bp,recv_msgs[3].data(),buffer_size);
-  memcpy(bp,mess.data(),buffer_size);
+  if (iszmqmultpart)
+    memcpy(bp,recv_msgs[3].data(),buffer_size);
+  else
+    memcpy(bp,mess.data(),buffer_size);
 
   return buffer::makeBuffer( bp, allocatedsize, &bptr);
 }
