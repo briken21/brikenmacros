@@ -257,15 +257,15 @@ void Init(){
 
     // Rate histograms--------------------------------------------------------------------------------
     // He3 Total
-    HRate_3HeTotal = new TH1F("HRate_3HeTotal","Rate 3He Total ; Time(s) ; Counts",400,0,6000);
+    HRate_3HeTotal = new TH1F("HRate_3HeTotal","Rate 3He Total ; Time(s) ; Counts",600,0,6000);
     // He3 Ring
     for (int imn=0; imn<7; imn++){
-      HRate_3He_Ring[imn] = new TH1F(Form("HRate_3He_Ring%d",imn+1),Form("Rate 3He Ring%d ; Time(s) ; Counts",imn+1),400,0,6000);
+      HRate_3He_Ring[imn] = new TH1F(Form("HRate_3He_Ring%d",imn+1),Form("Rate 3He Ring%d ; Time(s) ; Counts",imn+1),600,0,6000);
     }
     // TH1 Detectors
     for (int imk=1; imk<vName.size(); imk++){
       string HistoNameRate = " Rate detector "+vName[imk]+"; Time(s) ; Counts";
-      HRate1D_IndividualDetector[imk-1] = new TH1F(Form("HRate1D_Id%d",imk),HistoNameRate.c_str(),400,0,6000);
+      HRate1D_IndividualDetector[imk-1] = new TH1F(Form("HRate1D_Id%d",imk),HistoNameRate.c_str(),600,0,6000);
       for (int inr=0; inr<(HRate1D_IndividualDetector[imk-1]->GetNbinsX()); inr++){
         HRate1D_IndividualDetector[imk-1]->SetBinContent(inr,0.00001);
       }
