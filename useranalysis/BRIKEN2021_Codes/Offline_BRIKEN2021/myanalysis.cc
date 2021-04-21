@@ -385,8 +385,8 @@ void BRIKENTree_Construction(NIGIRI* treeModule, int BoardNumber){
       if ( data_BRIKEN.T == Last_Timestamp && (data_BRIKEN.E<900 || Last_Energy<900) ){
         Count_RepeatTime++;
         if (data_BRIKEN.E>150 && data_BRIKEN.E<820)Count_RepeatTime_Neutron++;
+        data_BRIKEN.T = data_BRIKEN.T + 1;
       }
-
       Last_Timestamp = data_BRIKEN.T;
       Last_Energy = data_BRIKEN.E;
     }
