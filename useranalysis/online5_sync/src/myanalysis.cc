@@ -50,8 +50,8 @@ NIGIRI* data;
 int nevtt = 0;
 
 //Correlation map
-#define MAX_MAP_LENGTH 2000
-#define MAX_N_CORR_MAPS 15
+#define MAX_MAP_LENGTH 500
+#define MAX_N_CORR_MAPS 13
 
 std::multimap <ULong64_t,UChar_t> datamap_lupo; //! sort by timestamp
 std::multimap <ULong64_t,UChar_t> datamap_dgtz[MAX_N_CORR_MAPS]; //! sort by timestamp
@@ -60,10 +60,10 @@ std::multimap<ULong64_t,UChar_t>::iterator it_datamap_dgtz[MAX_N_CORR_MAPS];
 
 Int_t nlupo;
 Int_t ncorr[MAX_N_CORR_MAPS];
-Int_t bmap[]= {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14};
+Int_t bmap[]= {0,1,2,3,4,5,6,7,8,9,10,11,12};
 Long64_t tcorroffsets[MAX_N_CORR_MAPS];
-Long64_t lowerbound[] = {12000,12000,12000,12000,12000,12000,12000,12000,12000,12000,12000,12000,12000,12000,12000};
-Long64_t upperbound[] = {12000,12000,12000,12000,12000,12000,12000,12000,12000,12000,12000,12000,12000,12000,12000};
+Long64_t lowerbound[] = {20000,20000,20000,20000,20000,20000,20000,20000,20000,20000,20000,20000,20000};
+Long64_t upperbound[] = {20000,20000,20000,20000,20000,20000,20000,20000,20000,20000,20000,20000,20000};
 TH1F* hlupodgtz[MAX_N_CORR_MAPS];
 TH1F* hlupodgtz_single;
 
@@ -74,21 +74,25 @@ ULong64_t ts_prev[MAX_N_BOARD];
 TCanvas* c1;
 
 void Init(){
-
     for (Int_t i=0;i<MAX_N_BOARD;i++){
         nevtb[i] = 0;
         ts_prev[i] = 0;
         tcorroffsets[i] = -i*1000;
     }
+    //! for decimation = 16
+    tcorroffsets[8]=-16400;
+    tcorroffsets[9]=-17400;
+    tcorroffsets[10]=-18400;
+    tcorroffsets[12]=-6000;
 
     c1=new TCanvas("c1","c1",900,700);
 
     nlupo = 0;
     for (Int_t i=0;i<MAX_N_CORR_MAPS;i++){
         ncorr[i] = 0;
-        hlupodgtz[i] = new TH1F(Form("hlupodgtz%d",i),Form("hlupodgtz%d",i),2000,-12000,12000);
+        hlupodgtz[i] = new TH1F(Form("hlupodgtz%d",i),Form("hlupodgtz%d",i),2000,-20000,20000);
     }
-    hlupodgtz_single = new TH1F("hcorr","hcorr",2000,-12000,12000);
+    hlupodgtz_single = new TH1F("hcorr","hcorr",2000,-20000,20000);
     hlupodgtz_single->Draw();
     pupdate(c1,2);
 }
@@ -119,19 +123,22 @@ void ProcessEvent(NIGIRI* data_now){
         }
     }
     if (data_now->b<0){
-      //cout<<"LUPO = "<<data_now->ts<<endl;
+        //cout<<"LUPO = "<<data_now->ts<<endl;
         datamap_lupo.insert(make_pair(data_now->ts,data_now->b));
     }else{
-        if (data_now->b<MAX_N_CORR_MAPS){
+        if (data_now->b<MAX_N_CORR_MAPS-1){
             if (bmap[data_now->b]>=0){
-          //if (data_now->b==9) cout<<data_now->b<<"-"<<data_now->ts<<endl;
+                //if (data_now->b==9) cout<<data_now->b<<"-"<<data_now->ts<<endl;
                 if (data_now->ts<ts_prev[data_now->b])
                     cout<<"TS reset on board" <<data_now->b<<", tsnow = "<<data_now->ts<<" tsprev="<<ts_prev[data_now->b]<<endl;
-
                 ts_prev[data_now->b]=data_now->ts;
                 datamap_dgtz[bmap[data_now->b]].insert(make_pair(data_now->ts,data_now->b));
             }
+        }else if (data_now->b==12){//V1730
+            if (data_now->GetHit(0)->ch==15)
+                datamap_dgtz[bmap[data_now->b]].insert(make_pair(data_now->ts,data_now->b));
         }
+
 //        else{
 //            if (data_now->b==8||data_now->b==9||data_now->b==10)cout<<data_now->b<<"\t"<<data_now->ts<<endl;
 //        }
@@ -181,13 +188,13 @@ typedef enum{
 
 
 //! full map
-//#define N_PACKETMAP 16
-//const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
-//const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
+//#define N_PACKETMAP 14
+//const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,61,100};
+//const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA};
 
-#define N_PACKETMAP 17
-const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,61,100,101,102,103};
-const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
+#define N_PACKETMAP 14
+const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,61,100};
+const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA};
 
 UShort_t ledthr[MAX_N_BOARD][V1740_N_MAX_CH];
 NIGIRI* data_prev[MAX_N_BOARD];

@@ -152,15 +152,15 @@ int rcdaqopen(const char * ip)
   else
     {
       if ( getenv("RCDAQHOST")  )
-	{
-	  host = getenv("RCDAQHOST");
-	}
-      else
-	{
-	  host = "localhost";
-	}
+    {
+      host = getenv("RCDAQHOST");
     }
-  
+      else
+    {
+      host = "localhost";
+    }
+    }
+
   theIterator = new rcdaqEventiterator(host.c_str(), status);
   if (status)
     {
@@ -570,7 +570,7 @@ void phelp()
   cout << " pendupdate(TCanvas *c1)              stop updating Canvas c1" << endl;
   cout << " pendupdate()                         stop updating all Canvases that are updating" << endl;
   cout << endl;
-#endif  
+#endif
   //  cout << " phsave(\"filename\")        saves all histograms made the histogram factory to the file" << endl;
   cout << "--" << endl;
 
@@ -601,7 +601,7 @@ void update_process (void * ptr)
   int highest_subpad = 0;
 
   // our argument
-  threadargument *ta = ( threadargument *) ptr; 
+  threadargument *ta = ( threadargument *) ptr;
 
   TVirtualPad *myPad = ta->thePad;
   unsigned int my_refreshinterval = ta->refreshinterval;
@@ -625,32 +625,32 @@ void update_process (void * ptr)
   while ( 1)
     {
       if ( stop_update)
-	{
-	  if ( pad_to_stop == 0)
-	    {
-	      break;
-	    }
-	  else
-	    {
-	      if (pad_to_stop == myPad) break;
-	    }
-	}
-      
+    {
+      if ( pad_to_stop == 0)
+        {
+          break;
+        }
+      else
+        {
+          if (pad_to_stop == myPad) break;
+        }
+    }
+
       time_t x = time(0);
       if ( x - last_time > my_refreshinterval)
-	{
-	  last_time = x;
-	  
-	  for ( i = 0; i <= highest_subpad; i++)
-	    {
-	      s = myPad->cd(i);
-	      s->Modified();
-	      s->Update();
-	    }
-	  sleep(1);
-	}
+    {
+      last_time = x;
+
+      for ( i = 0; i <= highest_subpad; i++)
+        {
+          s = myPad->cd(i);
+          s->Modified();
+          s->Update();
+        }
+      sleep(1);
     }
-  
+    }
+
 }
 
 
@@ -659,9 +659,9 @@ void pupdate(TVirtualPad * pad, const unsigned int refresh)
 
 #ifdef HAVE_ROOT6
   // this structure is getting deleted in the thread after
-  // we got everytthing off it. 
+  // we got everytthing off it.
   threadargument *ta = new threadargument;
-  
+
   // parameters for the thread - the pad, and the waitinterval
   ta->thePad = pad;
   ta->refreshinterval = refresh;
@@ -671,18 +671,18 @@ void pupdate(TVirtualPad * pad, const unsigned int refresh)
   mon_thread = new TThread ( update_process, ta);
   mon_thread->Run();
 #else
-  cout << "this is implemented in root v6 only" << endl; 
+  cout << "this is implemented in root v6 only" << endl;
 #endif
-  
+
 }
 
 void pend_update(TVirtualPad * pad)
-{  
+{
 #ifdef HAVE_ROOT6
   stop_update = 1;
   pad_to_stop = pad;
 #else
-  cout << "this is implemented in root v6 only" << endl; 
+  cout << "this is implemented in root v6 only" << endl;
 #endif
 
 }
