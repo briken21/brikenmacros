@@ -2,7 +2,7 @@ README OFFLINE analysis BRIKEN detector.
 Max Pallas: max.pallas@upc.edu
 *********************************************
 
-myanalysis_MP_V1730_V1740.cc
+myanalysis.cc
 This code is the Offline analysis for the BRIKEN detector.
 Input: evt file from digitizers V1730 and V1740. It looks for a configuration file called OfflineConf.csv in the same directory this code is.
 IMPORTANT: Check the PACKETMAP ZONE defined in this code and define the correct map for each set of files.
@@ -15,13 +15,9 @@ Also it is necessary to REPLACE libDataStruct.h located in include/ directory. T
 
 The configuration files in this directory:
 
-OfflineConf_Data30Mar2021:
-The first set of data available. It combines 3 V1740.
-The digitizers V1740 have connected the 3He 1-64, 65-125, 125-140.
-NOTE: It seems that module number 10 (3He 125-140) does not work.
-
-OfflineConf_Data08Apr2021:
-IMPORTANT: This file is a reconstruction. We had no information of the setup. Some elements can be WRONG.
-The third set of data available. It combines 3 V1730 and 1 V1740.
-The digitizers V1730 have connected the 3He 1-48. 16 channels each.
-The digitizer V1740 has connected the 3He 65-127.
+OfflineConf.csv:
+This file contains the channel configuration.
+The line structure must be preserved (First 140 3He, then 8 Clover, then X Ancillary).
+It is possible to add more parameters but then myanalysis.cc must be also changed.
+Some of the values of the parameter are wrong (especially for the clovers and ancillary). 
+So once the final setup is defined it must be set in this configuration file.
