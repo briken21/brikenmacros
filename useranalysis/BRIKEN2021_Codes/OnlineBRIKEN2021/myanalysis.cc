@@ -282,17 +282,17 @@ void Init(){
 
     // Energy histograms--------------------------------------------------------------------------------
     // TH2
-    H2D_Energy = new TH2F("H2D_Energy"," Id vs Energy ; Id ; Energy(keV) ",64*3,0,64*3,4000,0,4000);
+    H2D_Energy = new TH2F("H2D_Energy"," Id vs Energy ; Id ; Energy(keV) ",64*3,0,64*3,3000,0,3000);
     // TH1 He3 rings
     for (int imn=0; imn<7; imn++){
-      HEnergy3He_Ring[imn] = new TH1F(Form("HEnergy3He_Ring%d",imn+1),Form("Energy 3He Ring%d ; Energy(keV) ; Counts",imn+1),4000,0,4000);
+      HEnergy3He_Ring[imn] = new TH1F(Form("HEnergy3He_Ring%d",imn+1),Form("Energy 3He Ring%d ; Energy(keV) ; Counts",imn+1),3000,0,3000);
     }
     // TH1 Detectors
     for (int imk=1; imk<vName.size(); imk++){
       string HistoNameEnergy = " Energy detector "+vName[imk]+"; Energy(keV) ; Counts";
-      if (vInputType[imk]==1)HEnergy1D_IndividualDetector[imk-1] = new TH1F(Form("HEnergy1D_Id%d",imk),HistoNameEnergy.c_str(),4000,0,4000);
-      if (vInputType[imk]==2)HEnergy1D_IndividualDetector[imk-1] = new TH1F(Form("HEnergy1D_Id%d",imk),HistoNameEnergy.c_str(),40000,0,40000);
-      if (vInputType[imk]==3)HEnergy1D_IndividualDetector[imk-1] = new TH1F(Form("HEnergy1D_Id%d",imk),HistoNameEnergy.c_str(),40000,0,40000);
+      if (vInputType[imk]==1)HEnergy1D_IndividualDetector[imk-1] = new TH1F(Form("HEnergy1D_Id%d",imk),HistoNameEnergy.c_str(),3000,0,3000);
+      if (vInputType[imk]==2)HEnergy1D_IndividualDetector[imk-1] = new TH1F(Form("HEnergy1D_Id%d",imk),HistoNameEnergy.c_str(),3000,0,3000);
+      if (vInputType[imk]==3)HEnergy1D_IndividualDetector[imk-1] = new TH1F(Form("HEnergy1D_Id%d",imk),HistoNameEnergy.c_str(),3000,0,3000);
       for (int inr=0; inr<(HEnergy1D_IndividualDetector[imk-1]->GetNbinsX()); inr++){
         HEnergy1D_IndividualDetector[imk-1]->SetBinContent(inr,0.0001);
       }
