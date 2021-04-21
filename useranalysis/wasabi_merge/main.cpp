@@ -48,16 +48,18 @@ int main(int argc, char **argv) {
     std::string sourceOne;
     std::string sourceTwo;
     std::string sourceThree;
+    std::string outputFile;
 
-    if( argc == 4 ){
+    if( argc == 5 ){
         sourceOne = argv[1];
         sourceTwo = argv[2];
         sourceThree = argv[3];
+        outputFile = argv[4];
     }
     else {
-        std::cout << "WAS3ABI merger requires three source files." << std::endl;
+        std::cout << "WAS3ABI merger requires three source files and one output file." << std::endl;
         std::cout << "One for each of the DAQs." <<std::endl;
-        std::cout << "Usage: ./wasabi_merge /path/sourceOne /path/sourceTwo /path/SourceThree" << std::endl;
+        std::cout << "Usage: ./wasabi_merge /path/sourceOne /path/sourceTwo /path/SourceThree /path/OutputFile" << std::endl;
         return -1;
     }
 
@@ -94,7 +96,7 @@ int main(int argc, char **argv) {
     bool entryInMapThree = true;
 
     //Variables for output tree
-    TFile * ofile = TFile::Open( "sourceOneTimeOrdered.root", "recreate");
+    TFile * ofile = TFile::Open( outputFile.c_str(), "recreate");
     TTree * outputTTree = new TTree("AIDA_hits","");
     AidaTreeData outputEntry;
     outputTTree->Branch("aida_hit", &outputEntry,"T/l:Tfast/l:E/D:EX/D:EY/D:x/D:y/D:z/D:nx/I:ny/I:nz/I:ID/b");
