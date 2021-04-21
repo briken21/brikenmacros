@@ -52,6 +52,16 @@ AidaTreeData aida_data;
 multimap<ULong64_t, AidaTreeData> aida_data_map;
 multimap<ULong64_t, AidaTreeData>::iterator aidaIt;
 
+// Histograms for wasabi
+TH1D * channelHitPattern;
+TH2D * channelVsEnergy;
+TH2D * detXYBeta[4];
+TH2D * detXYImplant[4];
+TH2D * detExEyBeta[4];
+TH2D * detExEyImplant[4];
+int detNum;
+
+
 int nevt = 0;
 
 void Init(){
@@ -69,10 +79,28 @@ void ProcessEvent(NIGIRI* data_now){
 
     if (treedata->b >= 0 && treedata->b <= 7) {
         AIDAFromNIGIRI aidaEventBuilder(*data_now);
+        //Hit pattern histograms
+        for(auto hit : treedata->fhits){
+            if (0 < hit->clong){
+                channelHitPattern->Fill(treedata->b*64+hit->ch);
+                channelVsEnergy->Fill(treedata->b*64+hit->ch, hit->clong);
+            }
+        }
+
         aida_data_map = aidaEventBuilder.GetAIDAEvents();
         for (aidaIt = aida_data_map.begin(); aidaIt != aida_data_map.end(); aidaIt++) {
             aida_data = aidaIt->second;
             aida_tree->Fill();
+            //Matched event histograms
+            if(aida_data.ID == 4){
+                detNum = (int)aida_data.z;
+                detXYImplant[detNum]->Fill(aida_data.x, aida_data.y);
+                detExEyImplant[detNum]->Fill(aida_data.EX,aida_data.EY);
+            } else {
+                detNum = (int)aida_data.z;
+                detXYBeta[detNum]->Fill(aida_data.x, aida_data.y);
+                detExEyBeta[detNum]->Fill(aida_data.EX,aida_data.EY);
+            }
         }
     }
 
@@ -88,12 +116,37 @@ void OpenFile(const char* filename){
     tree->Branch("data",&treedata);
     aida_tree = new TTree("AIDA_hits","AIDA_hits");
     aida_tree->Branch("aida_hit", &aida_data,"T/l:Tfast/l:E/D:Ex/D:Ey/D:x/D:y/D:z/D:nx/I:ny/I:nz/I:ID/b");
+    //Define histograms
+    channelHitPattern = new TH1D("ChannelHitPattern","",512,0,512);
+    channelVsEnergy = new TH2D("ChannelVsEnergy","",512,0,512,500,0,5000);
+
+    std::string hName;
+    for(int i = 0; i < 4; i++){
+        hName = "DSSD" + std::to_string(i) + "XYBeta";
+        detXYBeta[i] = new TH2D(hName.c_str(),"",32,0,32,32,0,32);
+        hName = "DSSD" + std::to_string(i) + "XYImplant";
+        detXYImplant[i] = new TH2D(hName.c_str(),"",32,0,32,32,0,32);
+        hName = "DSSD" + std::to_string(i) + "EXEYBeta";
+        detExEyBeta[i] = new TH2D(hName.c_str(),"",500,0,5000,500,0,5000);
+        hName = "DSSD" + std::to_string(i) + "EXEYImplant";
+        detExEyImplant[i] = new TH2D(hName.c_str(),"",500,0,5000,500,0,5000);
+    }
 }
 
 void CloseMe(){
     if (file0) {
         if (tree) tree->Write();
         if (aida_tree) aida_tree->Write();
+
+        channelHitPattern->Write();
+        channelVsEnergy->Write();
+        for (int i = 0 ;i <4; i++) {
+            detXYBeta[i]->Write();
+            detXYImplant[i]->Write();
+            detExEyBeta[i]->Write();
+            detExEyImplant[i]->Write();
+        }
+
         file0->Close();
     }
     cout<<nevt<<endl;
