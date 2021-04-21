@@ -47,12 +47,17 @@ int main(int argc, char **argv) {
 
     std::string sourceOne;
     std::string sourceTwo;
+    std::string sourceThree;
 
-    if( argc == 3 ){
+    if( argc == 4 ){
         sourceOne = argv[1];
         sourceTwo = argv[2];
+        sourceThree = argv[3];
     }
     else {
+        std::cout << "WAS3ABI merger requires three source files." << std::endl;
+        std::cout << "One for each of the DAQs." <<std::endl;
+        std::cout << "Usage: ./wasabi_merge /path/sourceOne /path/sourceTwo /path/SourceThree" << std::endl;
         return -1;
     }
 
@@ -78,6 +83,16 @@ int main(int argc, char **argv) {
     chainTwo->SetBranchAddress("aida_hit", &aidaTwo->T, &b_aidaTwo);
     bool entryInMapTwo = true;
 
+    // Variables for source three
+    auto * chainThree = new TChain("AIDA_hits");
+    chainThree->Add(sourceThree.c_str());
+    TBranch *b_aidaThree;
+    ULong64_t nEntriesThree = chainThree->GetEntries();
+    ULong64_t currentEntryThree = 0;
+    auto * aidaThree = new AidaTreeData;
+    chainThree->SetBranchAddress("aida_hit", &aidaThree->T, &b_aidaThree);
+    bool entryInMapThree = true;
+
     //Variables for output tree
     TFile * ofile = TFile::Open( "sourceOneTimeOrdered.root", "recreate");
     TTree * outputTTree = new TTree("AIDA_hits","");
@@ -88,11 +103,15 @@ int main(int argc, char **argv) {
     std::multimap<myTime_t, AidaTreeData> aidaMap;
     std::multimap<myTime_t, AidaTreeData>::iterator aidaMapIt;
     std::multimap<myTime_t, AidaTreeData>::iterator aidaMapLimitIt;
-    const Long64_t maxMapTimeSpan = 60e9; //Holds max 60s
+    const Long64_t maxMapTimeSpan = 120e9; //Holds max 60s
     const Long64_t mapClearSpan = 10e9; // Once holding 60s clear 10s of map
     ULong64_t maxTS;
+    ULong64_t mapSize = 0;
 
-    while( currentEntryOne<nEntriesOne || currentEntryTwo < nEntriesTwo){
+    while( currentEntryOne<nEntriesOne || currentEntryTwo < nEntriesTwo || currentEntryThree < nEntriesThree){
+        if(currentEntryOne % 1000000 == 0 || currentEntryTwo % 1000000 ==0 || currentEntryThree % 1000000 == 0){
+            std::cout << currentEntryOne << " " << currentEntryTwo << " " << currentEntryThree << std::endl;
+        }
         //Get values from map
         if(currentEntryOne<nEntriesOne && entryInMapOne) {
             chainOne->GetEntry(currentEntryOne);
@@ -102,11 +121,17 @@ int main(int argc, char **argv) {
             chainTwo->GetEntry(currentEntryTwo);
             entryInMapTwo = false;
         }
+        if(currentEntryThree < nEntriesThree && entryInMapThree){
+            chainThree->GetEntry(currentEntryThree);
+            entryInMapThree = false;
+        }
 
         //Entering values into map
         if(!entryInMapOne){
-            if(aidaOne->T > aidaTwo->T || currentEntryTwo == nEntriesTwo){
-                if(aidaOne->T - aidaTwo->T < 5e9 || currentEntryTwo == nEntriesTwo){
+            if((aidaOne->T > aidaTwo->T || currentEntryTwo == nEntriesTwo) &&
+                (aidaOne->T > aidaThree->T || currentEntryThree == nEntriesThree)){
+                if((aidaOne->T - aidaTwo->T < 5e9 || currentEntryTwo == nEntriesTwo) &&
+                    (aidaOne->T - aidaThree->T < 5e9 || currentEntryThree == nEntriesThree)){
                     aidaMap.emplace(aidaOne->T, *aidaOne);
                     currentEntryOne++;
                     entryInMapOne = true;
@@ -119,8 +144,10 @@ int main(int argc, char **argv) {
             }
         }
         if(!entryInMapTwo){
-            if(aidaTwo->T > aidaOne->T || currentEntryOne == nEntriesOne){
-                if(aidaTwo->T - aidaOne->T > 5e9 || currentEntryOne == nEntriesOne){
+            if((aidaTwo->T > aidaOne->T || currentEntryOne == nEntriesOne) &&
+               (aidaTwo->T > aidaThree->T || currentEntryThree == nEntriesThree)){
+                if((aidaTwo->T - aidaOne->T < 5e9 || currentEntryOne == nEntriesOne) &&
+                    (aidaTwo->T - aidaThree->T < 5e9 || currentEntryThree == nEntriesThree)){
                     aidaMap.emplace(aidaTwo->T, *aidaTwo);
                     currentEntryTwo++;
                     entryInMapTwo = true;
@@ -132,7 +159,30 @@ int main(int argc, char **argv) {
                 entryInMapTwo = true;
             }
         }
+        if(!entryInMapThree){
+            if((aidaThree->T > aidaTwo->T || currentEntryTwo == nEntriesTwo) &&
+               (aidaThree->T > aidaOne->T || currentEntryOne == nEntriesOne)){
+                if((aidaThree->T - aidaTwo->T < 5e9 || currentEntryTwo == nEntriesTwo) &&
+                    (aidaThree->T - aidaOne->T < 5e9 || currentEntryOne == nEntriesOne)){
+                    aidaMap.emplace(aidaThree->T, *aidaThree);
+                    currentEntryThree++;
+                    entryInMapThree = true;
+                }
+            }
+            else{
+                aidaMap.emplace(aidaThree->T, *aidaThree);
+                currentEntryThree++;
+                entryInMapThree = true;
+            }
+        }
 
+        if(mapSize == aidaMap.size()){
+            std::cout << "Map hasn't changed size" << std::endl;
+            std::cout << currentEntryOne << " " << currentEntryTwo << " " << currentEntryThree <<std::endl;
+            std::cout << nEntriesOne << " " << nEntriesTwo << " " << nEntriesThree << std::endl;
+            std::cout << aidaOne->T << " " << aidaTwo->T << " " << aidaThree->T << std::endl;
+            std::cout << entryInMapOne << " " << entryInMapTwo << " " << entryInMapThree << std::endl;
+        }
         //Check if max span held in map
         aidaMapIt = aidaMap.begin();
         if(aidaOne->T < aidaTwo->T){
@@ -150,7 +200,7 @@ int main(int argc, char **argv) {
             }
             aidaMap.erase(aidaMap.begin(),aidaMapLimitIt);
         }
-
+        mapSize = aidaMap.size();
     }
     //Clear the remaining map
     for(aidaMapIt = aidaMap.begin(); aidaMapIt != aidaMap.end(); aidaMapIt++){
@@ -164,35 +214,34 @@ int main(int argc, char **argv) {
 
 
     //Check for time ordering of AIDA file
-    /*
-    std::cout << "Defining his" <<std::endl;
-    TFile * file = new TFile("HisFile.root","RECREATE");
-    TH1D * timeDif = new TH1D("TimeDif","",1e6,0,1e6);
-    std::cout << "Starting loop" <<std::endl;
-    ULong64_t previousTimestamp = 0;
-    ULong64_t maxTSShift = 0;
-    while( currentEntryOne < nEntriesOne){
-        chainOne->GetEntry(currentEntryOne);
-        if(aidaOne->T < previousTimestamp){
-            //std::cout << "Warning full file is not time ordered." << std::endl;
-            //std::cout << "Timewarp size: " << previousTimestamp - aidaOne->T << std::endl;
-            if( previousTimestamp - aidaOne->T > maxTSShift){
-                maxTSShift = previousTimestamp - aidaOne->T;
-                std::cout << aidaOne->z << " z" << std::endl;
-            }
-        }
 
-        timeDif->Fill(aidaOne->T - previousTimestamp);
-        previousTimestamp = aidaOne->T;
-        currentEntryOne++;
-    }
-    TCanvas * c1 = new TCanvas("c1","c1",800,800);
-    timeDif->Draw();
-    std::cout << "Max Time warp " << maxTSShift << std::endl;
-    file->Write();
+//    std::cout << "Defining his" <<std::endl;
+//    TFile * file = new TFile("HisFile.root","RECREATE");
+//    TH1D * timeDif = new TH1D("TimeDif","",1e6,0,1e6);
+//    std::cout << "Starting loop" <<std::endl;
+//    ULong64_t previousTimestamp = 0;
+//    ULong64_t maxTSShift = 0;
+//    while( currentEntryOne < nEntriesOne){
+//        chainOne->GetEntry(currentEntryOne);
+//        if(aidaOne->T < previousTimestamp){
+//            //std::cout << "Warning full file is not time ordered." << std::endl;
+//            //std::cout << "Timewarp size: " << previousTimestamp - aidaOne->T << std::endl;
+//            if( previousTimestamp - aidaOne->T > maxTSShift){
+//                maxTSShift = previousTimestamp - aidaOne->T;
+//                std::cout << aidaOne->z << " z" << " " << previousTimestamp - aidaOne->T <<  std::endl;
+//            }
+//        }
+//
+//        timeDif->Fill(aidaOne->T - previousTimestamp);
+//        previousTimestamp = aidaOne->T;
+//        currentEntryOne++;
+//    }
+//    TCanvas * c1 = new TCanvas("c1","c1",800,800);
+//    timeDif->Draw();
+//    std::cout << "Max Time warp " << maxTSShift << std::endl;
+//    file->Write();
 
-
-    //------------End of time order check-----------*/
+    //------------End of time order check-----------
     std::cout << nEntriesOne+nEntriesTwo << " " << currentEntryOne+currentEntryTwo << " " <<std::endl;
 
 
