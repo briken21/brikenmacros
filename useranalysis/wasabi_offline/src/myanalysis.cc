@@ -59,6 +59,10 @@ TH2D * detXYBeta[4];
 TH2D * detXYImplant[4];
 TH2D * detExEyBeta[4];
 TH2D * detExEyImplant[4];
+
+TH2D * dE0vdESum;
+double dE0 = 0;
+double dESum = 0;
 int detNum;
 
 
@@ -81,9 +85,18 @@ void ProcessEvent(NIGIRI* data_now){
         //dE detector event
         dEFromNIGIRI dEEventBuilder(*data_now);
         aida_data_map = dEEventBuilder.GetdEEvents();
+        dESum = 0;
         for( auto dEIt : aida_data_map){
             aida_data = dEIt.second;
+            if (aida_data.z == 0){
+                dE0 = aida_data.E;
+            } else{
+                dESum += aida_data.E;
+            }
             aida_tree->Fill();
+            channelHitPattern->Fill(aida_data.z+520);
+            channelVsEnergy->Fill(aida_data.z+520,aida_data.E);
+            dE0vdESum->Fill(dE0, dESum);
         }
     }
 
@@ -127,8 +140,9 @@ void OpenFile(const char* filename){
     aida_tree = new TTree("AIDA_hits","AIDA_hits");
     aida_tree->Branch("aida_hit", &aida_data,"T/l:Tfast/l:E/D:Ex/D:Ey/D:x/D:y/D:z/D:nx/I:ny/I:nz/I:ID/b");
     //Define histograms
-    channelHitPattern = new TH1D("ChannelHitPattern","",512,0,512);
-    channelVsEnergy = new TH2D("ChannelVsEnergy","",512,0,512,500,0,5000);
+    channelHitPattern = new TH1D("ChannelHitPattern","",527,0,527);
+    channelVsEnergy = new TH2D("ChannelVsEnergy","",527,0,527,500,0,5000);
+    dE0vdESum = new TH2D("dE0VsdESum","",500,0,5e3,500,0,5e3);
 
     std::string hName;
     for(int i = 0; i < 4; i++){
@@ -150,6 +164,7 @@ void CloseMe(){
 
         channelHitPattern->Write();
         channelVsEnergy->Write();
+        dE0vdESum->Write();
         for (int i = 0 ;i <4; i++) {
             detXYBeta[i]->Write();
             detXYImplant[i]->Write();
@@ -184,13 +199,13 @@ typedef enum{
 //const pmap_decode packetdecode[]={V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
 
 //! current map Used for the Bi data
-const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
-const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
+//const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
+//const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
 
 //Map from 210419 elog
-//#define N_PACKETMAP 14
-//const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,61,100};
-//const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA};
+#define N_PACKETMAP 14
+const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,61,100};
+const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA};
 UShort_t ledthr[MAX_N_BOARD][V1740_N_MAX_CH];
 NIGIRI* data_prev[MAX_N_BOARD];
 
