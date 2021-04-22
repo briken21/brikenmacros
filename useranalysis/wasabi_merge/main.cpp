@@ -15,8 +15,8 @@ public:
     ULong64_t       T;
     ULong64_t       Tfast;
     Double_t        E;
-    Double_t        EX;
-    Double_t        EY;
+    Double_t        Ex;
+    Double_t        Ey;
     Double_t        x;
     Double_t        y;
     Double_t        z;
@@ -28,8 +28,8 @@ public:
         T=0;
         Tfast=0;
         E=0;
-        EX=0;
-        EY=0;
+        Ex=0;
+        Ey=0;
         x=0;
         y=0;
         z=0;
@@ -116,10 +116,13 @@ int main(int argc, char **argv) {
     std::multimap<myTime_t, AidaTreeData> aidaMap;
     std::multimap<myTime_t, AidaTreeData>::iterator aidaMapIt;
     std::multimap<myTime_t, AidaTreeData>::iterator aidaMapLimitIt;
+    std::multimap<myTime_t, AidaTreeData> aidaEventMap;
     const Long64_t maxMapTimeSpan = 120e9; //Holds max 60s
     const Long64_t mapClearSpan = 10e9; // Once holding 60s clear 10s of map
     ULong64_t maxTS;
     ULong64_t mapSize = 0;
+    ULong64_t lastImplantT = 0;
+    double maxImpDSSD = 0;
 
     while( currentEntryOne<nEntriesOne || currentEntryTwo < nEntriesTwo || currentEntryThree < nEntriesThree){
         if(currentEntryOne % 1000000 == 0){
@@ -207,9 +210,33 @@ int main(int argc, char **argv) {
         if(maxTS - aidaMapIt->first >= maxMapTimeSpan){
             aidaMapLimitIt = aidaMap.lower_bound(aidaMapIt->first + mapClearSpan);
 
+            lastImplantT = 0;
             for(aidaMapIt = aidaMap.begin(); aidaMapIt != aidaMapLimitIt; aidaMapIt++){
-                outputEntry = aidaMapIt->second;
-                outputTTree->Fill();
+                if (aidaMapIt->second.ID == 5 || (aidaMapIt->second.T - lastImplantT < 5000 && lastImplantT != 0)) {
+                    //Within 5us of last implant
+                    aidaEventMap.emplace(aidaMapIt->first, aidaMapIt->second);
+                    if(aidaMapIt->second.z > maxImpDSSD){
+                        maxImpDSSD = aidaMapIt->second.z;
+                    }
+                }
+                else{
+                    //Greater than 5us span since last implant.
+                    //Through out all but dE and max
+                    for( auto event : aidaEventMap){
+                        if(event.second.ID == 5){
+                            outputEntry = event.second;
+                            outputTTree->Fill();
+                        }
+                        else if( event.second.z < 11 || event.second.z == maxImpDSSD) {
+                            outputEntry = event.second;
+                            outputTTree->Fill();
+                        }
+                    }
+                    lastImplantT = 0;
+                    maxImpDSSD = 0;
+                    aidaEventMap.clear();
+
+                }
             }
             aidaMap.erase(aidaMap.begin(),aidaMapLimitIt);
         }
@@ -217,9 +244,44 @@ int main(int argc, char **argv) {
     }
     //Clear the remaining map
     for(aidaMapIt = aidaMap.begin(); aidaMapIt != aidaMap.end(); aidaMapIt++){
-        outputEntry = aidaMapIt->second;
-        outputTTree->Fill();
+        if (aidaMapIt->second.ID == 5 || (aidaMapIt->second.T - lastImplantT < 5000 && lastImplantT != 0)) {
+            //Within 5us of last implant
+            aidaEventMap.emplace(aidaMapIt->first, aidaMapIt->second);
+            if(aidaMapIt->second.z > maxImpDSSD){
+                maxImpDSSD = aidaMapIt->second.z;
+            }
+        }
+        else{
+            //Greater than 5us span since last implant.
+            //Through out all but dE and max
+            for( auto event : aidaEventMap){
+                if(event.second.ID == 5){
+                    outputEntry = event.second;
+                    outputTTree->Fill();
+                }
+                else if( event.second.z < 11 || event.second.z == maxImpDSSD){
+                    outputEntry = event.second;
+                    outputTTree->Fill();
+                }
+            }
+            lastImplantT = 0;
+            maxImpDSSD = 0;
+            aidaEventMap.clear();
+
+        }
     }
+    //Clear the remaining event map
+    for( auto event : aidaEventMap){
+        if(event.second.ID == 5){
+            outputEntry = event.second;
+            outputTTree->Fill();
+        }
+        else if( event.second.z < 11 || event.second.z == maxImpDSSD){
+            outputEntry = event.second;
+            outputTTree->Fill();
+        }
+    }
+
     outputTTree->Write();
     ofile->Close();
 
