@@ -76,23 +76,34 @@ int main(int argc, char **argv) {
     bool entryInMapOne = true;
 
     // Variables for source two
-    auto * chainTwo = new TChain("AIDA_hits");
-    chainTwo->Add(sourceTwo.c_str());
-    TBranch *b_aidaTwo;
-    ULong64_t nEntriesTwo = chainTwo->GetEntries();
+
+    auto *chainTwo = new TChain("AIDA_hits");
+    ULong64_t nEntriesTwo = 0;
     ULong64_t currentEntryTwo = 0;
-    auto * aidaTwo = new AidaTreeData;
-    chainTwo->SetBranchAddress("aida_hit", &aidaTwo->T, &b_aidaTwo);
+    auto aidaTwo = new AidaTreeData;
+    aidaTwo->clear();
+    if (sourceTwo != "NULL") {
+        chainTwo->Add(sourceTwo.c_str());
+        TBranch *b_aidaTwo;
+        nEntriesTwo = chainTwo->GetEntries();
+        currentEntryTwo = 0;
+        chainTwo->SetBranchAddress("aida_hit", &aidaTwo->T, &b_aidaTwo);
+    }
     bool entryInMapTwo = true;
 
     // Variables for source three
     auto * chainThree = new TChain("AIDA_hits");
-    chainThree->Add(sourceThree.c_str());
-    TBranch *b_aidaThree;
-    ULong64_t nEntriesThree = chainThree->GetEntries();
+    ULong64_t nEntriesThree = 0;
     ULong64_t currentEntryThree = 0;
-    auto * aidaThree = new AidaTreeData;
-    chainThree->SetBranchAddress("aida_hit", &aidaThree->T, &b_aidaThree);
+    auto aidaThree = new AidaTreeData;
+    aidaThree->clear();
+    if (sourceThree != "NULL") {
+        chainThree->Add(sourceThree.c_str());
+        TBranch *b_aidaThree;
+        nEntriesThree = chainThree->GetEntries();
+        currentEntryThree = 0;
+        chainThree->SetBranchAddress("aida_hit", &aidaThree->T, &b_aidaThree);
+    }
     bool entryInMapThree = true;
 
     //Variables for output tree
@@ -111,7 +122,7 @@ int main(int argc, char **argv) {
     ULong64_t mapSize = 0;
 
     while( currentEntryOne<nEntriesOne || currentEntryTwo < nEntriesTwo || currentEntryThree < nEntriesThree){
-        if(currentEntryOne % 1000000 == 0 || currentEntryTwo % 1000000 ==0 || currentEntryThree % 1000000 == 0){
+        if(currentEntryOne % 1000000 == 0){
             std::cout << currentEntryOne << " " << currentEntryTwo << " " << currentEntryThree << std::endl;
         }
         //Get values from map
