@@ -103,10 +103,10 @@ void ProcessEvent(NIGIRI* data_now){
     if (data_now->b >= 0 && data_now->b <= 7) {
         AIDAFromNIGIRI aidaEventBuilder(*data_now);
         //Hit pattern histograms
-        for(auto hit : treedata->fhits){
+        for(auto hit : data_now->fhits){
             if (0 < hit->clong){
-                channelHitPattern->Fill(treedata->b*64+hit->ch);
-                channelVsEnergy->Fill(treedata->b*64+hit->ch, hit->clong);
+                channelHitPattern->Fill(data_now->b*64+hit->ch);
+                channelVsEnergy->Fill(data_now->b*64+hit->ch, hit->clong);
             }
         }
 
@@ -140,8 +140,8 @@ void OpenFile(const char* filename){
     aida_tree = new TTree("AIDA_hits","AIDA_hits");
     aida_tree->Branch("aida_hit", &aida_data,"T/l:Tfast/l:E/D:Ex/D:Ey/D:x/D:y/D:z/D:nx/I:ny/I:nz/I:ID/b");
     //Define histograms
-    channelHitPattern = new TH1D("ChannelHitPattern","",527,0,527);
-    channelVsEnergy = new TH2D("ChannelVsEnergy","",527,0,527,500,0,5000);
+    channelHitPattern = new TH1D("ChannelHitPattern","",535,0,535);
+    channelVsEnergy = new TH2D("ChannelVsEnergy","",535,0,535,500,0,5000);
     dE0vdESum = new TH2D("dE0VsdESum","",500,0,5e3,500,0,5e3);
 
     std::string hName;
