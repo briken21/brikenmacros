@@ -23,7 +23,7 @@ using namespace std;
 #include <TROOT.h>
 #include <TChain.h>
 #include <TFile.h>
-#include <cstring>
+#include <string.h>
 
 
 class WasabiStripData{
@@ -38,7 +38,7 @@ public:
     };
     ~WasabiStripData(){};
     void UpdateEvent(ULong64_t ts_in, int channel_in, Double_t Energy_in,
-                     double DSSD_in, UChar_t ID_in){
+                     int DSSD_in, UChar_t ID_in){
         ts = ts_in;
         if(firstChannel == -1){
             firstChannel = (double)channel_in;
@@ -49,7 +49,7 @@ public:
         }
 
         energy += Energy_in;
-        DSSD = DSSD_in;
+        DSSD = (double)DSSD_in;
         ID = ID_in;
     };
     void ResetEvent(){
@@ -86,7 +86,7 @@ public:
         uint8_t dx = xEvent.lastChannel-xEvent.firstChannel;
         uint8_t dy = yEvent.lastChannel-yEvent.firstChannel;
         Tfast = dx + 0x100 * dy;
-        z = xEvent.DSSD;
+        z = xEvent.DSSD + 11.0;
         nx = nx_in;
         ny = ny_in;
         nz = 1;
@@ -480,7 +480,7 @@ public:
     };
     //Should be a multimap
     multimap<ULong64_t ,AidaTreeData> aida_events;
-    double board_dssd_map[8] ={11.,12.,13.,14.,11.,12.,13.,14.};
+    double board_dssd_map[8] ={0.,1.,2.,3.,0.,1.,2.,3.};
     UChar_t board_ID_map[8] = {5,5,5,5,4,4,4,4};
     //Vectors for strip events
     vector<WasabiStripData> xEvents;

@@ -107,7 +107,7 @@ void ProcessEvent(NIGIRI* data_now){
                 detXYImplant[detNum]->Fill(aida_data.x, aida_data.y);
                 detExEyImplant[detNum]->Fill(aida_data.EX,aida_data.EY);
             } else {
-                detNum = (int)aida_data.z;
+                detNum = (int)aida_data.z-11.0;
                 detXYBeta[detNum]->Fill(aida_data.x, aida_data.y);
                 detExEyBeta[detNum]->Fill(aida_data.EX,aida_data.EY);
             }
@@ -184,13 +184,13 @@ typedef enum{
 //const pmap_decode packetdecode[]={V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
 
 //! current map Used for the Bi data
-//const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
-//const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
+const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
+const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
 
 //Map from 210419 elog
-#define N_PACKETMAP 14
-const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,61,100};
-const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA};
+//#define N_PACKETMAP 14
+//const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,61,100};
+//const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA};
 UShort_t ledthr[MAX_N_BOARD][V1740_N_MAX_CH];
 NIGIRI* data_prev[MAX_N_BOARD];
 
