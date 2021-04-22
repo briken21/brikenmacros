@@ -25,10 +25,6 @@ TH1 correlation neutron neutron.
 TH1 correlation F11 neutron.
 
 
-To run this code, REPLACE the code myanalysis.cc from the src/ directory. Only one file that does the analysis can be placed in the directory.
-In that directory, the cmake looks for the .cc files. For that reason, this script can be named whatever you want if the extension is .cc.
-
-
 
 The configuration files in this directory:
 
