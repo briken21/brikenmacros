@@ -393,22 +393,20 @@ void DoUpdate(){ // Refresh function
 
 void ProcessEvent(NIGIRI* data_now){
 
-/*
-    if (data_now->b==11){
 
-    }
+
+
 
     if (data_now->b<0){
         //data_now->Print();
     }
 
-    if (data_now->b==8||data_now->b==9||data_now->b==10){
-*/
+
 // Maybe should we convinient to change this condition but I NEED first the FINAL configuration
-    if (data_now->b>0){
+    if (data_now->b==8||data_now->b==9||data_now->b==10){
       for (Int_t i=0;i<V1740_N_MAX_CH;i++){// Loop per all the 64 channels from 1740 modules
         NIGIRIHit* hit=data_now->GetHit(i);
-        if (hit->clong>100){//Avoid noisy channels
+        if (hit->clong>50){//Avoid noisy channels
 
           if (FlagStart==0){// If it is the first entry read the conf file and set a time reference.
             ConfigurationFile_Reader();
@@ -450,7 +448,6 @@ void ProcessEvent(NIGIRI* data_now){
 
 
           if (vInputType[IdChannel_Trigger]==1)MapNeutron.emplace(hit->ts,hit->ts);
-          if (vId[IdChannel_Trigger]==149)MapF11_Right.emplace(hit->ts,hit->ts);
 
         }
       }// End condition clong<100
@@ -469,16 +466,7 @@ void ProcessEvent(NIGIRI* data_now){
       MapF11_Right.clear();
 
     }
-/*
-    if (MapNeutron.size()>MapNeutronMaxBufferSize){// Correlation plot neutron neutron
-      for (auto it=MapF11_Right.begin(); it!=MapF11_Right.end(); it++){
-        for (auto itk=MapNeutron.begin(); itk!=MapNeutron.end(); itk++){
-          HCorrelationF11Neutron->Fill((itk->second-it->second)*1e-6, HCorrelationF11Neutron->GetBinWidth(10));
-        }
-      }
-      MapNeutron.clear();
-    }
-*/
+
   }// End condition board selection
 }// End function
 
@@ -575,7 +563,7 @@ typedef enum{
 
 #define N_PACKETMAP 14
 const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,61,100};
-const pmap_decode packetdecode[]={NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,NONE};
+const pmap_decode packetdecode[]={NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA};
 
 //#define N_PACKETMAP 14
 //const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,61,100};
@@ -830,18 +818,56 @@ void decodeV1730dpppha(Packet* p1730dpppha){
                 Double_t tpz_baseline = ((Double_t)(channeldata.extras2&0xFFFF))/4.;
                 data->ts = (((ULong64_t)tsmsb<<31)&0x7FFF80000000)|(ULong64_t)tslsb;
                 data->ts = data->ts*V1730_DGTZ_CLK_RES;
-                //cout<<channelaggr.extra2_enable_flag<<"\t"<<channelaggr.extra_option_enable_flag<<"\t"<<data->ts<<endl;
-                NIGIRIHit* hit = new NIGIRIHit;
-                hit->ch = channeldata.ch;
-                hit->clong = channeldata.energy;
-                hit->baseline = tpz_baseline;
-                //! assign analog and digital probe
-                hit->pulse_ap1 =channeldata.ap1_sample;
-                hit->pulse_ap2 =channeldata.ap1_sample;
-                hit->pulse_dp1 =channeldata.dp_sample;;
-                hit->pulse_dp2 =channeldata.trg_sample;
-                data->AddHit(hit);
-                ProcessEvent(data);
+
+
+
+                if (channeldata.energy>0){
+
+                  if (FlagStart==0){// If it is the first entry read the conf file and set a time reference.
+                    ConfigurationFile_Reader();
+                    TimeStampReference = (data->ts*1e-9)-50;//First timestamp used as reference to plot rate histograms
+                    FlagStart=1;
+                  }
+
+
+                // Assign each signal a channel and detector
+                  IdChannel_Trigger = 10;
+                  int Conf_Flag1 = 0;
+                  for (int yun=1; yun<vCrate.size(); yun++){
+                    if (vCrate[yun] == data->b && vChannel[yun]==channeldata.ch){
+                      IdChannel_Trigger = yun;
+                      Conf_Flag1 = 1;
+                      break;
+                    }
+                  }
+                  if (Conf_Flag1==0){
+                    cout << "Module or channel number missing in configuration file. Assigning arbitrary Id=10" << endl;
+                    cout << "Module missing:  " << data->b << endl;
+                    cout << "Channel missing:  " << channeldata.ch << endl;
+                  }
+                //----------------------------------------------------
+                //Filling histograms
+                if (channeldata.energy*vEFactor[IdChannel_Trigger]+vEOffset[IdChannel_Trigger]>vThreshold[IdChannel_Trigger]){// Set threshold in keV.
+
+                  // Energy histograms------------------------
+                  H2D_Energy->Fill(IdChannel_Trigger,channeldata.energy*vEFactor[IdChannel_Trigger]+vEOffset[IdChannel_Trigger]);
+                  HEnergy1D_IndividualDetector[IdChannel_Trigger-1]->Fill(channeldata.energy*vEFactor[IdChannel_Trigger]+vEOffset[IdChannel_Trigger], 1./(HEnergy1D_IndividualDetector[IdChannel_Trigger-1]->GetBinWidth(10)));
+                  //------------------------------------------
+                  //Rate histograms
+                  HRate1D_IndividualDetector[IdChannel_Trigger-1]->Fill(data->ts*1e-9-TimeStampReference, 1./(HRate1D_IndividualDetector[IdChannel_Trigger-1]->GetBinWidth(10)) );
+
+                  if (vId[IdChannel_Trigger]==149)MapF11_Right.emplace(data->ts,data->ts);
+
+                }
+
+
+
+
+
+
+
+                }
+
             }//loop on channel data
             //pos+=channelaggr.size;
         }//loop through all  dual channels data
