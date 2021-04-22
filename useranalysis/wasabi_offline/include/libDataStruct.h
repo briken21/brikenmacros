@@ -93,7 +93,7 @@ public:
         ID = xEvent.ID;
 
     };
-    AidaTreeData(int channel, double Energy, ULong64_t ts){
+    AidaTreeData(double det, double Energy, ULong64_t ts){
         T = ts;
         Tfast = 0;
         E = Energy;
@@ -101,7 +101,7 @@ public:
         EY = Energy;
         x = 0.;
         y = 0.;
-        z = (double)channel;
+        z = det;
         nx = 0;
         ny = 0;
         nz = 0;
@@ -495,7 +495,7 @@ public:
         aida_events.clear();
         for(auto hit : obj.fhits){
             if (hit->clong > 0){
-                AidaTreeData aidaEvent(hit->ch, hit->clong, hit->ts);
+                AidaTreeData aidaEvent(detectorMap[hit->ch], hit->clong, hit->ts);
                 aida_events.emplace(aidaEvent.T, aidaEvent);
             }
         }
@@ -508,6 +508,7 @@ public:
         return aida_events;
     }
     multimap<ULong64_t ,AidaTreeData> aida_events;
+    double detectorMap[10]= {1.,2.,3.,4.,5.,6.,7.,8.,9.,0.};
 };
 
 #endif
