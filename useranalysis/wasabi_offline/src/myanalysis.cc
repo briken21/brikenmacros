@@ -37,7 +37,7 @@
 #define NSBL 8
 #define N_MAX_WF_LENGTH 90
 UShort_t trig_pos = N_MAX_WF_LENGTH*30/100;//unit of sample
-UShort_t sampling_interval = 16*16;//unit of ns
+UShort_t sampling_interval = 8*16;//unit of ns
 
 TFile* file0 = 0;
 TTree* tree = 0;
@@ -250,7 +250,7 @@ int pinit()
   for (Int_t i=0;i<MAX_N_BOARD;i++){
       data_prev[i]=0;
       for (Int_t j=0;j<V1740_N_MAX_CH;j++){
-          ledthr[i][j]=1550;
+          ledthr[i][j]=1600;
       }
   }
 
