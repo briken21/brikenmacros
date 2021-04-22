@@ -494,7 +494,7 @@ public:
     dEFromNIGIRI(NIGIRI & obj){
         aida_events.clear();
         for(auto hit : obj.fhits){
-            if (hit->clong > 0){
+            if (hit->clong > 0 && hit->ch >0 && hit->ch < 11){
                 AidaTreeData aidaEvent(detectorMap[hit->ch], hit->clong, hit->ts);
                 aida_events.emplace(aidaEvent.T, aidaEvent);
             }
@@ -508,7 +508,7 @@ public:
         return aida_events;
     }
     multimap<ULong64_t ,AidaTreeData> aida_events;
-    double detectorMap[10]= {1.,2.,3.,4.,5.,6.,7.,8.,9.,0.};
+    double detectorMap[11]= {0.0,1.,2.,3.,4.,5.,6.,7.,8.,9.,0.};
 };
 
 #endif
