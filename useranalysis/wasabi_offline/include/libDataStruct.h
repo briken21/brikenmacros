@@ -23,7 +23,7 @@ using namespace std;
 #include <TROOT.h>
 #include <TChain.h>
 #include <TFile.h>
-#include <string.h>
+#include <cstring>
 
 
 class WasabiStripData{
@@ -38,7 +38,7 @@ public:
     };
     ~WasabiStripData(){};
     void UpdateEvent(ULong64_t ts_in, int channel_in, Double_t Energy_in,
-                     int DSSD_in, UChar_t ID_in){
+                     double DSSD_in, UChar_t ID_in){
         ts = ts_in;
         if(firstChannel == -1){
             firstChannel = (double)channel_in;
@@ -49,7 +49,7 @@ public:
         }
 
         energy += Energy_in;
-        DSSD = (double)DSSD_in;
+        DSSD = DSSD_in;
         ID = ID_in;
     };
     void ResetEvent(){
@@ -91,6 +91,21 @@ public:
         ny = ny_in;
         nz = 1;
         ID = xEvent.ID;
+
+    };
+    AidaTreeData(int channel, double Energy, ULong64_t ts){
+        T = ts;
+        Tfast = 0;
+        E = Energy;
+        EX = Energy;
+        EY = Energy;
+        x = 0.;
+        y = 0.;
+        z = (double)channel;
+        nx = 0;
+        ny = 0;
+        nz = 0;
+        ID = 4;
 
     };
 
@@ -396,11 +411,15 @@ public:
         yEvents.clear();
         int nx = 0;
         int ny=0;
+        double threshold = 0;
+        if ( board_ID_map[obj.b] == 4 ){
+            threshold = 4000.0;
+        }
         WasabiStripData strip_event;
         //Get x and y strip events
         //Always 64 events in the vector
         for(auto x = 0; x < obj.fhits.size(); x++){
-            if(obj.fhits.at(x)->clong > 0) {
+            if(obj.fhits.at(x)->clong > threshold) {
                 if (obj.fhits.at(x)->ch < 32) {
                     nx++;
                     if(obj.fhits.at(x)->ch - strip_event.lastChannel == 1 || strip_event.lastChannel == -1) {
@@ -461,7 +480,7 @@ public:
     };
     //Should be a multimap
     multimap<ULong64_t ,AidaTreeData> aida_events;
-    double board_dssd_map[8] ={0.,1.,2.,3.,0.,1.,2.,3.};
+    double board_dssd_map[8] ={11.,12.,13.,14.,11.,12.,13.,14.};
     UChar_t board_ID_map[8] = {5,5,5,5,4,4,4,4};
     //Vectors for strip events
     vector<WasabiStripData> xEvents;
@@ -470,6 +489,26 @@ public:
 
 };
 
+class dEFromNIGIRI{
+public:
+    dEFromNIGIRI(NIGIRI & obj){
+        aida_events.clear();
+        for(auto hit : obj.fhits){
+            if (hit->clong > 0){
+                AidaTreeData aidaEvent(hit->ch, hit->clong, hit->ts);
+                aida_events.emplace(aidaEvent.T, aidaEvent);
+            }
+        }
+        for (auto eventIt : aida_events){
+            eventIt.second.nz = aida_events.size();
+        }
+
+    };
+    multimap<ULong64_t ,AidaTreeData> GetdEEvents() const{
+        return aida_events;
+    }
+    multimap<ULong64_t ,AidaTreeData> aida_events;
+};
 
 #endif
 

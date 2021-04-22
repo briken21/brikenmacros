@@ -77,7 +77,17 @@ void ProcessEvent(NIGIRI* data_now){
     data_now->Copy(*treedata);
     tree->Fill();
 
-    if (treedata->b >= 0 && treedata->b <= 7) {
+    if (data_now->b == 11) {
+        //dE detector event
+        dEFromNIGIRI dEEventBuilder(*data_now);
+        aida_data_map = dEEventBuilder.GetdEEvents();
+        for( auto dEIt : aida_data_map){
+            aida_data = dEIt.second;
+            aida_tree->Fill();
+        }
+    }
+
+    if (data_now->b >= 0 && data_now->b <= 7) {
         AIDAFromNIGIRI aidaEventBuilder(*data_now);
         //Hit pattern histograms
         for(auto hit : treedata->fhits){
@@ -173,10 +183,14 @@ typedef enum{
 //const int packetmap[]={50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
 //const pmap_decode packetdecode[]={V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
 
-//! current map
-const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
-const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
+//! current map Used for the Bi data
+//const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
+//const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
 
+//Map from 210419 elog
+#define N_PACKETMAP 14
+const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,61,100};
+const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA};
 UShort_t ledthr[MAX_N_BOARD][V1740_N_MAX_CH];
 NIGIRI* data_prev[MAX_N_BOARD];
 
