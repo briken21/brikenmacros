@@ -25,6 +25,8 @@
 
 #include <iostream>
 #include <fstream>
+#include <sstream>
+
 
 #include <correlation.h>
 #include "TThread.h"
@@ -39,7 +41,7 @@
 #define NSBL 8
 #define N_MAX_WF_LENGTH 90
 UShort_t trig_pos = N_MAX_WF_LENGTH*30/100;//unit of sample
-UShort_t sampling_interval = 16*8;//unit of ns
+UShort_t sampling_interval = 16*8;//unit of ns ASK PHONG IF 16*16
 
 TFile* file0;
 NIGIRI* data;
@@ -54,13 +56,28 @@ TH1F* HEnergy1D_IndividualDetector[160];
 TH1F* HRate1D_IndividualDetector[160];
 
 // Neutron histograms
+TH1F* HRate_3He_Ring[7];
 TH1F* HEnergy3He_Ring[7];
 TH1F* HRate_3HeTotal;
-TH1F* HRate_3He_Ring[7];
+TH1F* HEnergy_3HeTotal;
+
+// Gamma histograms
+TH1F* HEnergy_GammaTotal;
+TH1F* HRate_GammaTotal;
 
 //Correlation histograms
 TH1F* HCorrelationNeutronNeutron;
 TH1F* HCorrelationF11Neutron;
+TH1F* HCorrelationNeutronGamma;
+TH1F* HCorrelationF11Gamma;
+
+// Rate distribution histograms
+TH1F* HRateNeutronBottomRight;
+TH1F* HRateNeutronBottomLeft;
+TH1F* HRateNeutronTopRight;
+TH1F* HRateNeutronTopLeft;
+
+
 
 // Dummies
 int nevt_pre = -1;
@@ -71,7 +88,8 @@ double TimeStampReference=0;
 // Map for correlations
 std::multimap<double,double> MapNeutron;
 std::multimap<double,double> MapF11_Right;
-int MapNeutronMaxBufferSize = 1000; // Set the size of the correlation buffer. Increasing this value slow down the online
+std::multimap<double,double> MapGamma;
+int MapNeutronMaxBufferSize = 2000; // Set the size of the correlation buffer. Increasing this value slow down the online
 
 
 // Canvas General
@@ -98,6 +116,10 @@ TCanvas *Ancillary_Energy_Canvas;
 TCanvas *Correlation_Canvas;
 //--------------------
 
+// Canvas Neutron distribution
+TCanvas *NeutronDistribution_Canvas;
+//--------------------
+
 
 // Configuration file parameters
 std::vector<string> vName;
@@ -113,6 +135,11 @@ std::vector<double> vThreshold;
 int IdChannel_Trigger=0;
 
 
+int vCenter[16] = {2,6,8,12,24,14,18,20,28,48,40,60,83,96,113,126};
+int vBottomRight[31] = {7,10,22,19,49,50,51,55,56,57,61,62,64,75,76,79,80,114,115,119,120,127,128,129,130,132,136,137,138,139,140};
+int vBottomLeft[31] = {1,4,13,16,45,46,47,52,53,54,58,59,63,73,74,77,78,111,112,116,117,118,122,123,124,125,131,132,133,134,135};
+int vTopRight[31] = {9,11,21,23,31,35,36,37,29,30,44,41,42,67,68,71,72,84,85,89,90,91,97,98,99,100,106,107,108,109,110};
+int vTopLeft[31] = {3,5,15,17,32,33,34,38,25,26,27,43,39,65,66,69,70,81,82,86,87,88,92,93,94,95,101,102,103,104,105};
 
 //------------------------------------------------------------
 
@@ -195,8 +222,10 @@ void OpenMainCanvas(){
   Neutron_RingEnergy_Canvas->SetFillColor(10);
   Neutron_RingEnergy_Canvas->Divide(4,2);
   Neutron_RingEnergy_Canvas->Draw();
+  Neutron_RingEnergy_Canvas->cd(1);
+  HEnergy_3HeTotal->Draw("histo");
   for (int imn=0; imn<7; imn++){
-    Neutron_RingEnergy_Canvas->cd(imn+1);
+    Neutron_RingEnergy_Canvas->cd(imn+2);
     HEnergy3He_Ring[imn]->Draw("histo");
   }
 
@@ -219,7 +248,11 @@ void OpenMainCanvas(){
   Gamma_Energy_Canvas->SetFillColor(10);
   Gamma_Energy_Canvas->Divide(4,2);
   Gamma_Energy_Canvas->Draw();
-  for (int imn=0; imn<8; imn++){
+  Gamma_Energy_Canvas->cd(1);
+  HEnergy_GammaTotal->Draw("histo");
+  Gamma_Energy_Canvas->cd(2);
+  HEnergy1D_IndividualDetector[140]->Draw("histo");
+  for (int imn=2; imn<8; imn++){
     Gamma_Energy_Canvas->cd(imn+1);
     HEnergy1D_IndividualDetector[imn+140]->Draw("histo");
   }
@@ -229,7 +262,11 @@ void OpenMainCanvas(){
   Gamma_Rate_Canvas->SetFillColor(10);
   Gamma_Rate_Canvas->Divide(4,2);
   Gamma_Rate_Canvas->Draw();
-  for (int imn=0; imn<8; imn++){
+  Gamma_Rate_Canvas->cd(1);
+  HRate_GammaTotal->Draw("histo");
+  Gamma_Rate_Canvas->cd(2);
+  HRate1D_IndividualDetector[140]->Draw("histo");
+  for (int imn=2; imn<8; imn++){
     Gamma_Rate_Canvas->cd(imn+1);
     HRate1D_IndividualDetector[imn+140]->Draw("histo");
   }
@@ -238,7 +275,7 @@ void OpenMainCanvas(){
   if (Ancillary_Energy_Canvas)Ancillary_Energy_Canvas->Close();
   Ancillary_Energy_Canvas = new TCanvas("Ancillary_Energy_Canvas","Ancillary Energy",900,900);
   Ancillary_Energy_Canvas->SetFillColor(10);
-  Ancillary_Energy_Canvas->Divide(4,2);
+  Ancillary_Energy_Canvas->Divide(2,2);
   Ancillary_Energy_Canvas->Draw();
   for (int imn=0; imn<8; imn++){
     if (HEnergy1D_IndividualDetector[imn+148]){
@@ -250,7 +287,7 @@ void OpenMainCanvas(){
   if (Ancillary_Rate_Canvas)Ancillary_Rate_Canvas->Close();
   Ancillary_Rate_Canvas = new TCanvas("Ancillary_Rate_Canvas","Ancillary Rate",900,900);
   Ancillary_Rate_Canvas->SetFillColor(10);
-  Ancillary_Rate_Canvas->Divide(4,2);
+  Ancillary_Rate_Canvas->Divide(2,2);
   Ancillary_Rate_Canvas->Draw();
   for (int imn=0; imn<8; imn++){
     if (HRate1D_IndividualDetector[imn+148]){
@@ -263,13 +300,30 @@ void OpenMainCanvas(){
   if (Correlation_Canvas)Correlation_Canvas->Close();
   Correlation_Canvas = new TCanvas("Correlation_Canvas","Correlation Canvas",900,900);
   Correlation_Canvas->SetFillColor(10);
-  Correlation_Canvas->Divide(4,2);
+  Correlation_Canvas->Divide(2,2);
   Correlation_Canvas->Draw();
   Correlation_Canvas->cd(1);
   HCorrelationNeutronNeutron->Draw("histo");
   Correlation_Canvas->cd(2);
   HCorrelationF11Neutron->Draw("histo");
+  Correlation_Canvas->cd(3);
+  HCorrelationNeutronGamma->Draw("histo");
+  Correlation_Canvas->cd(4);
+  HCorrelationF11Gamma->Draw("histo");
 
+  //Neutron distribution
+  NeutronDistribution_Canvas = new TCanvas("NeutronDistribution_Canvas","Neutron ditribution Canvas",900,900);
+  NeutronDistribution_Canvas->SetFillColor(10);
+  NeutronDistribution_Canvas->Divide(2,2);
+  NeutronDistribution_Canvas->Draw();
+  NeutronDistribution_Canvas->cd(4);
+  HRateNeutronBottomRight->Draw("histo");
+  NeutronDistribution_Canvas->cd(3);
+  HRateNeutronBottomLeft->Draw("histo");
+  NeutronDistribution_Canvas->cd(2);
+  HRateNeutronTopRight->Draw("histo");
+  NeutronDistribution_Canvas->cd(1);
+  HRateNeutronTopLeft->Draw("histo");
 //----------------------------------------------------------------------
 
 }// End function
@@ -283,6 +337,7 @@ void Init(){
     // Energy histograms--------------------------------------------------------------------------------
     // TH2
     H2D_Energy = new TH2F("H2D_Energy"," Id vs Energy ; Id ; Energy(keV) ",64*3,0,64*3,5000,0,5000);
+    HEnergy_3HeTotal = new TH1F("HEnergy_3HeTotal","Energy 3He Total ; Time(s) ; Counts",600,0,3000);
     // TH1 He3 rings
     for (int imn=0; imn<7; imn++){
       HEnergy3He_Ring[imn] = new TH1F(Form("HEnergy3He_Ring%d",imn+1),Form("Energy 3He Ring%d ; Energy(keV) ; Counts",imn+1),600,0,3000);
@@ -293,10 +348,14 @@ void Init(){
       if (vInputType[imk]==1)HEnergy1D_IndividualDetector[imk-1] = new TH1F(Form("HEnergy1D_Id%d",imk),HistoNameEnergy.c_str(),600,0,3000);
       if (vInputType[imk]==2)HEnergy1D_IndividualDetector[imk-1] = new TH1F(Form("HEnergy1D_Id%d",imk),HistoNameEnergy.c_str(),6000,0,6000);
       if (vInputType[imk]==3)HEnergy1D_IndividualDetector[imk-1] = new TH1F(Form("HEnergy1D_Id%d",imk),HistoNameEnergy.c_str(),6000,0,6000);
-      for (int inr=0; inr<(HEnergy1D_IndividualDetector[imk-1]->GetNbinsX()); inr++){
-        HEnergy1D_IndividualDetector[imk-1]->SetBinContent(inr,0.0001);
-      }
+      //for (int inr=0; inr<(HEnergy1D_IndividualDetector[imk-1]->GetNbinsX()); inr++){
+        //HEnergy1D_IndividualDetector[imk-1]->SetBinContent(inr,0.0001);
+      //}
     }
+
+    // Gamma Total
+    HEnergy_GammaTotal = new TH1F("HEnergy_GammaTotal","Energy Gamma Total ; Energy(keV) ; Counts",6000,0,6000);
+
     //--------------------------------------------------------------------------------------------------
 
     // Rate histograms--------------------------------------------------------------------------------
@@ -310,16 +369,32 @@ void Init(){
     for (int imk=1; imk<vName.size(); imk++){
       string HistoNameRate = " Rate detector "+vName[imk]+"; Time(s) ; Counts";
       HRate1D_IndividualDetector[imk-1] = new TH1F(Form("HRate1D_Id%d",imk),HistoNameRate.c_str(),400,0,4000);
-      for (int inr=0; inr<(HRate1D_IndividualDetector[imk-1]->GetNbinsX()); inr++){
-        HRate1D_IndividualDetector[imk-1]->SetBinContent(inr,0.00001);
-      }
+      //for (int inr=0; inr<(HRate1D_IndividualDetector[imk-1]->GetNbinsX()); inr++){
+        //HRate1D_IndividualDetector[imk-1]->SetBinContent(inr,0.00001);
+      //}
     }
+    // Gamma Total
+    HRate_GammaTotal = new TH1F("HRate_GammaTotal","Rate Gamma Total ; Time(s) ; Counts",400,0,4000);
     //----------------------------------------------------------
     // Correlation histograms histograms--------------------------------------------------------------------------------
     // Neutron
-    HCorrelationNeutronNeutron = new TH1F("HCorrelationNeutronNeutron","Neutron-Neutron Correlation ; Time(ms) ; Counts",600,-300,300);
-    HCorrelationF11Neutron = new TH1F("HCorrelationF11Neutron","F11-Neutron Correlation ; Time(ms) ; Counts",600,-300,300);
+    HCorrelationNeutronNeutron = new TH1F("HCorrelationNeutronNeutron","Neutron-Neutron Correlation ; Time(ms) ; Counts",800,-2,2);
+    HCorrelationF11Neutron = new TH1F("HCorrelationF11Neutron","F11-Neutron Correlation ; Time(ms) ; Counts",800,-2,2);
+    HCorrelationNeutronGamma = new TH1F("HCorrelationNeutronGamma","Neutron-Gamma Correlation ; Time(ms) ; Counts",800,-2,2);
+    HCorrelationF11Gamma = new TH1F("HCorrelationF11Gamma","F11-Gamma Correlation ; Time(ms) ; Counts",200,-0.1,0.1);
     //----------------------------------------------------------
+
+    // Neutron distribution-------------------------------------
+
+    HRateNeutronBottomRight = new TH1F("HRateNeutronBottomRight","Bottom Right 3He Rate ; Time(s) ; Counts",400,0,4000);
+    HRateNeutronBottomLeft = new TH1F("HRateNeutronBottomLeft","Bottom Left 3He Rate ; Time(s) ; Counts",400,0,4000);
+    HRateNeutronTopRight = new TH1F("HRateNeutronTopRight","Top Right 3He Rate ; Time(s) ; Counts",400,0,4000);
+    HRateNeutronTopLeft = new TH1F("HRateNeutronTopLeft","Top Left 3He Rate ; Time(s) ; Counts",400,0,4000);
+
+    //--------------------------------------------------------
+
+
+
 
     OpenMainCanvas();
 }
@@ -329,9 +404,9 @@ void DoUpdate(){ // Refresh function
 
     if ( nevt_pre!=nevt){//Refresh condition
       FlagRepetition=0;
-      cout << "********************" << endl;
-      cout << "Refresh time!!!" << endl;
-      cout << "Event:  " << nevt << endl;
+      //cout << "********************" << endl;
+      //cout << "Refresh time!!!" << endl;
+      //cout << "Event:  " << nevt << endl;
       nevt_pre = nevt;
 
       Energy2D_Canvas->cd();
@@ -363,23 +438,33 @@ void DoUpdate(){ // Refresh function
       }
 
 // Ancillary refresh----------------------------------
-      for (int imn=0; imn<8; imn++){
+      for (int imn=0; imn<4; imn++){
         Ancillary_Energy_Canvas->cd(imn+1);
         gPad->Modified();
         Ancillary_Energy_Canvas->Update();
       }
-      for (int imn=0; imn<8; imn++){
+      for (int imn=0; imn<4; imn++){
         Ancillary_Rate_Canvas->cd(imn+1);
         gPad->Modified();
         Ancillary_Rate_Canvas->Update();
       }
 
 //Correlation refresh------------------------------------
-      for (int imn=0; imn<8; imn++){
-        Correlation_Canvas->cd(1);
+      for (int imn=0; imn<4; imn++){
+        Correlation_Canvas->cd(imn+1);
         gPad->Modified();
         Correlation_Canvas->Update();
       }
+
+//Neutron distribution refresh------------------------------------
+      for (int imn=0; imn<4; imn++){
+        NeutronDistribution_Canvas->cd(imn+1);
+        gPad->Modified();
+        NeutronDistribution_Canvas->Update();
+      }
+
+
+
     }// End refresh condition
 
 
@@ -392,10 +477,6 @@ void DoUpdate(){ // Refresh function
 }
 
 void ProcessEvent(NIGIRI* data_now){
-
-
-
-
 
     if (data_now->b<0){
         //data_now->Print();
@@ -438,6 +519,7 @@ void ProcessEvent(NIGIRI* data_now){
 
           // Energy histograms------------------------
           H2D_Energy->Fill(IdChannel_Trigger,hit->clong*vEFactor[IdChannel_Trigger]+vEOffset[IdChannel_Trigger]);
+          HEnergy_3HeTotal->Fill(hit->clong*vEFactor[IdChannel_Trigger]+vEOffset[IdChannel_Trigger],1./(HEnergy_3HeTotal->GetBinWidth(10)) );
           HEnergy1D_IndividualDetector[IdChannel_Trigger-1]->Fill(hit->clong*vEFactor[IdChannel_Trigger]+vEOffset[IdChannel_Trigger], 1./(HEnergy1D_IndividualDetector[IdChannel_Trigger-1]->GetBinWidth(10)));
           if (vInputType[IdChannel_Trigger]==1)HEnergy3He_Ring[vIndex1[IdChannel_Trigger]-1]->Fill(hit->clong*vEFactor[IdChannel_Trigger]+vEOffset[IdChannel_Trigger], 1./(HEnergy3He_Ring[vIndex1[IdChannel_Trigger]-1]->GetBinWidth(10)));
           //------------------------------------------
@@ -449,6 +531,20 @@ void ProcessEvent(NIGIRI* data_now){
 
           if (vInputType[IdChannel_Trigger]==1)MapNeutron.emplace(hit->ts,hit->ts);
 
+
+          for (int tny=0; tny<31; tny++){
+            if (vBottomRight[tny]==IdChannel_Trigger)HRateNeutronBottomRight->Fill(hit->ts*1e-9-TimeStampReference, 1./(HRateNeutronBottomRight->GetBinWidth(10)) );
+          }
+          for (int tny=0; tny<31; tny++){
+            if (vBottomLeft[tny]==IdChannel_Trigger)HRateNeutronBottomLeft->Fill(hit->ts*1e-9-TimeStampReference, 1./(HRateNeutronBottomLeft->GetBinWidth(10)) );
+          }
+          for (int tny=0; tny<31; tny++){
+            if (vTopRight[tny]==IdChannel_Trigger)HRateNeutronTopRight->Fill(hit->ts*1e-9-TimeStampReference, 1./(HRateNeutronTopRight->GetBinWidth(10)) );
+          }
+          for (int tny=0; tny<31; tny++){
+            if (vTopLeft[tny]==IdChannel_Trigger)HRateNeutronTopLeft->Fill(hit->ts*1e-9-TimeStampReference, 1./(HRateNeutronTopLeft->GetBinWidth(10)) );
+          }
+
         }
       }// End condition clong<100
     }// End loop all 64 channels V1740
@@ -459,12 +555,23 @@ void ProcessEvent(NIGIRI* data_now){
           HCorrelationNeutronNeutron->Fill((itk->second-it->second)*1e-6, HCorrelationNeutronNeutron->GetBinWidth(10));
         }
         for (auto itk=MapF11_Right.begin(); itk!=MapF11_Right.end(); itk++){ // Correlation plot F11 neutron
-          HCorrelationF11Neutron->Fill((itk->second-it->second)*1e-6, HCorrelationF11Neutron->GetBinWidth(10));
+          HCorrelationF11Neutron->Fill((it->second-itk->second)*1e-6, HCorrelationF11Neutron->GetBinWidth(10));
+        }
+        for (auto itk=MapGamma.begin(); itk!=MapGamma.end(); itk++){ // Correlation plot F11 neutron
+          HCorrelationNeutronGamma->Fill((itk->second-it->second)*1e-6, HCorrelationNeutronGamma->GetBinWidth(10));
         }
       }
+
+      for (auto it=MapF11_Right.begin(); it!=MapF11_Right.end(); it++){
+        for (auto itk=MapGamma.begin(); itk!=MapGamma.end(); itk++){ // Correlation plot neutron neutron
+          HCorrelationF11Gamma->Fill((itk->second-it->second)*1e-6, HCorrelationF11Gamma->GetBinWidth(10));
+        }
+      }
+
+
       MapNeutron.clear();
       MapF11_Right.clear();
-
+      MapGamma.clear();
     }
 
   }// End condition board selection
@@ -488,15 +595,19 @@ int SaveHistograms(){
   string Minute=Form("%d",ltm->tm_min);
   string Time = "Online"+Year+Month+Day+"_"+Hour+Minute+".root";
 
+  string OldConfFile="cp  OfflineConf.csv OfflineConf_Online"+Year+Month+Day+"_"+Hour+Minute+".csv";
+  gSystem->Exec(OldConfFile.c_str());
+
   file0 = new TFile(Time.c_str(),"recreate");
 
   if (file0){
-    cout << "Save histograms" << endl;
+    cout << "Save histograms and canvas" << endl;
 
-    H2D_Energy->Write();
+    if (H2D_Energy)H2D_Energy->Write();
+    if (HEnergy_3HeTotal)HEnergy_3HeTotal->Write();
     // TH1 He3 rings
     for (int imn=0; imn<7; imn++){
-      HEnergy3He_Ring[imn]->Write();
+      if (HEnergy3He_Ring[imn])HEnergy3He_Ring[imn]->Write();
     }
     // TH1 Detectors
     for (int imk=0; imk<160; imk++){
@@ -508,7 +619,7 @@ int SaveHistograms(){
     HRate_3HeTotal->Write();
     // He3 Ring
     for (int imn=0; imn<7; imn++){
-      HRate_3He_Ring[imn]->Write();
+      if (HRate_3He_Ring[imn])HRate_3He_Ring[imn]->Write();
     }
     // TH1 Detectors
     for (int imk=0; imk<160; imk++){
@@ -517,6 +628,44 @@ int SaveHistograms(){
     // Correlation histograms--------------------------------------------------------------------------------
     if (HCorrelationNeutronNeutron) HCorrelationNeutronNeutron->Write();
     if (HCorrelationF11Neutron) HCorrelationF11Neutron->Write();
+    if (HCorrelationNeutronGamma) HCorrelationNeutronGamma->Write();
+    if (HCorrelationF11Gamma) HCorrelationF11Gamma->Write();
+
+    // Neutron distribution histograms
+    if (HRateNeutronBottomRight) HRateNeutronBottomRight->Write();
+    if (HRateNeutronBottomLeft) HRateNeutronBottomLeft->Write();
+    if (HRateNeutronTopRight) HRateNeutronTopRight->Write();
+    if (HRateNeutronTopLeft) HRateNeutronTopLeft->Write();
+
+
+    // Canvas General
+    if (Energy2D_Canvas) Energy2D_Canvas->Write();
+    if (EnergyDetectorCanvas) EnergyDetectorCanvas->Write();
+    if (RateDetectorCanvas) RateDetectorCanvas->Write();
+    //--------------------
+
+    // Canvas Neutron
+    if (Neutron_RingRate_Canvas) Neutron_RingRate_Canvas->Write();
+    if (Neutron_RingEnergy_Canvas) Neutron_RingEnergy_Canvas->Write();
+    //--------------------
+
+    // Canvas Gamma
+    if (Gamma_Rate_Canvas) Gamma_Rate_Canvas->Write();
+    if (Gamma_Energy_Canvas) Gamma_Energy_Canvas->Write();
+    //--------------------
+
+    // Canvas Ancillary
+    if (Ancillary_Rate_Canvas) Ancillary_Rate_Canvas->Write();
+    if (Ancillary_Energy_Canvas) Ancillary_Energy_Canvas->Write();
+    //--------------------
+
+    // Canvas Correlation
+    if (Correlation_Canvas) Correlation_Canvas->Write();
+    //--------------------
+
+    // Canvas Neutron Distribution
+    if (NeutronDistribution_Canvas) NeutronDistribution_Canvas->Write();
+    //--------------------
 
   }
   return 0;
@@ -532,8 +681,6 @@ int CloseMe(){
 
     return 0;
 }
-
-
 
 //!**************************************************
 //! Data decoding
@@ -845,27 +992,24 @@ void decodeV1730dpppha(Packet* p1730dpppha){
                     cout << "Module missing:  " << data->b << endl;
                     cout << "Channel missing:  " << channeldata.ch << endl;
                   }
-                //----------------------------------------------------
-                //Filling histograms
-                if (channeldata.energy*vEFactor[IdChannel_Trigger]+vEOffset[IdChannel_Trigger]>vThreshold[IdChannel_Trigger]){// Set threshold in keV.
+                  //----------------------------------------------------
+                  //Filling histograms
+                  if (channeldata.energy*vEFactor[IdChannel_Trigger]+vEOffset[IdChannel_Trigger]>vThreshold[IdChannel_Trigger]){// Set threshold in keV.
 
-                  // Energy histograms------------------------
-                  H2D_Energy->Fill(IdChannel_Trigger,channeldata.energy*vEFactor[IdChannel_Trigger]+vEOffset[IdChannel_Trigger]);
-                  HEnergy1D_IndividualDetector[IdChannel_Trigger-1]->Fill(channeldata.energy*vEFactor[IdChannel_Trigger]+vEOffset[IdChannel_Trigger], 1./(HEnergy1D_IndividualDetector[IdChannel_Trigger-1]->GetBinWidth(10)));
-                  //------------------------------------------
-                  //Rate histograms
-                  HRate1D_IndividualDetector[IdChannel_Trigger-1]->Fill(data->ts*1e-9-TimeStampReference, 1./(HRate1D_IndividualDetector[IdChannel_Trigger-1]->GetBinWidth(10)) );
-
-                  if (vId[IdChannel_Trigger]==149)MapF11_Right.emplace(data->ts,data->ts);
-
-                }
+                    // Energy histograms------------------------
+                    H2D_Energy->Fill(IdChannel_Trigger,channeldata.energy*vEFactor[IdChannel_Trigger]+vEOffset[IdChannel_Trigger]);
+                    if (vInputType[IdChannel_Trigger]==2)HEnergy_GammaTotal->Fill(channeldata.energy*vEFactor[IdChannel_Trigger]+vEOffset[IdChannel_Trigger], 1./(HEnergy_GammaTotal->GetBinWidth(10)) );
+                    HEnergy1D_IndividualDetector[IdChannel_Trigger-1]->Fill(channeldata.energy*vEFactor[IdChannel_Trigger]+vEOffset[IdChannel_Trigger], 1./(HEnergy1D_IndividualDetector[IdChannel_Trigger-1]->GetBinWidth(10)));
+                    //------------------------------------------
+                    //Rate histograms
+                    HRate1D_IndividualDetector[IdChannel_Trigger-1]->Fill(data->ts*1e-9-TimeStampReference, 1./(HRate1D_IndividualDetector[IdChannel_Trigger-1]->GetBinWidth(10)) );
+                    if (vInputType[IdChannel_Trigger]==2)HRate_GammaTotal->Fill(data->ts*1e-9-TimeStampReference, 1./(HRate_GammaTotal->GetBinWidth(10)) );
 
 
+                    if (vId[IdChannel_Trigger]==149)MapF11_Right.emplace(data->ts,data->ts);
+                    if (vInputType[IdChannel_Trigger]==2)MapGamma.emplace(data->ts,data->ts);
 
-
-
-
-
+                  }
                 }
 
             }//loop on channel data
