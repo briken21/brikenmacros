@@ -25,7 +25,6 @@ using namespace std;
 #include <TFile.h>
 #include <string.h>
 
-
 class WasabiStripData{
 public:
     WasabiStripData(){
@@ -35,10 +34,13 @@ public:
         energy = 0;
         DSSD = -1;
         ID = 0;
+        finets = 9000;
+        min_time_strip = -1;
     };
     ~WasabiStripData(){};
     void UpdateEvent(ULong64_t ts_in, int channel_in, Double_t Energy_in,
-                     int DSSD_in, UChar_t ID_in){
+                     int DSSD_in, UChar_t ID_in, int finets_in){
+     
         ts = ts_in;
         if(firstChannel == -1){
             firstChannel = (double)channel_in;
@@ -51,6 +53,14 @@ public:
         energy += Energy_in;
         DSSD = (double)DSSD_in;
         ID = ID_in;
+        if(finets_in < finets){
+            min_time_strip = (double)channel_in;
+            finets = finets_in;
+        }
+        if(ID == 4){
+        energy = 2700;
+        }
+       
     };
     void ResetEvent(){
         ts=-1;
@@ -59,6 +69,8 @@ public:
         energy = 0;
         DSSD = -1;
         ID = 0;
+        finets=9000;
+        min_time_strip = -1;
     }
     ULong64_t ts;
     Double_t firstChannel;
@@ -66,6 +78,8 @@ public:
     Double_t energy;
     Double_t DSSD;
     UChar_t ID;
+    double min_time_strip;
+    int finets;
 };
 
 class AidaTreeData {
@@ -81,11 +95,18 @@ public:
         E = (xEvent.energy + yEvent.energy)/2.0;
         EX = xEvent.energy;
         EY = yEvent.energy;
+        if(xEvent.ID == 5){
         x = (xEvent.lastChannel+xEvent.firstChannel)/2.0;
         y = ((yEvent.lastChannel+yEvent.firstChannel)/2.0)-32.0;
         uint8_t dx = xEvent.lastChannel-xEvent.firstChannel;
         uint8_t dy = yEvent.lastChannel-yEvent.firstChannel;
         Tfast = dx + 0x100 * dy;
+        }
+        else{
+        x = xEvent.min_time_strip;
+        y = yEvent.min_time_strip-32.0;
+        Tfast = 0;
+        }
         z = xEvent.DSSD + 11.0;
         nx = nx_in;
         ny = ny_in;
@@ -404,7 +425,7 @@ public:
 
 class AIDAFromNIGIRI{
 public:
-    AIDAFromNIGIRI(NIGIRI & obj){
+    AIDAFromNIGIRI(NIGIRI & obj, int runNum){
         //Clear maps and vectors
         aida_events.clear();
         xEvents.clear();
@@ -412,47 +433,55 @@ public:
         int nx = 0;
         int ny=0;
         double threshold = 0;
+        double match = 600;
+        int finetsCut = 31;
+        if ( runNum > 26){
+          finetsCut = 75;
+        }
         if ( board_ID_map[obj.b] == 4 ){
-            threshold = 4000.0;
+            threshold = 2700.0;
+            match = 20e3;
         }
         WasabiStripData strip_event;
         //Get x and y strip events
         //Always 64 events in the vector
         for(auto x = 0; x < obj.fhits.size(); x++){
             if(obj.fhits.at(x)->clong > threshold) {
-                if (obj.fhits.at(x)->ch < 32) {
+            if((board_ID_map[obj.b] == 4 && obj.fhits.at(x)->finets < finetsCut)  || board_ID_map[obj.b] == 5){
+               if (obj.fhits.at(x)->ch < 32) {
                     nx++;
                     if(obj.fhits.at(x)->ch - strip_event.lastChannel == 1 || strip_event.lastChannel == -1) {
                         strip_event.UpdateEvent(obj.fhits.at(x)->ts, x, obj.fhits.at(x)->clong,
-                                                board_dssd_map[obj.b], board_ID_map[obj.b]);
+                                                board_dssd_map[obj.b], board_ID_map[obj.b], obj.fhits.at(x)->finets);
                     }
                     else {
                         xEvents.push_back(strip_event);
                         strip_event.ResetEvent();
                         strip_event.UpdateEvent(obj.fhits.at(x)->ts, x, obj.fhits.at(x)->clong,
-                                                board_dssd_map[obj.b], board_ID_map[obj.b]);
+                                                board_dssd_map[obj.b], board_ID_map[obj.b], obj.fhits.at(x)->finets);
                     }
                 } else if ((obj.fhits.at(x)->ch >= 32)) {
                     ny++;
                     if ((obj.fhits.at(x)->ch - strip_event.lastChannel == 1 && strip_event.lastChannel > 31) || strip_event.lastChannel == -1){
                         strip_event.UpdateEvent(obj.fhits.at(x)->ts, x, obj.fhits.at(x)->clong,
-                                                board_dssd_map[obj.b], board_ID_map[obj.b]);
+                                                board_dssd_map[obj.b], board_ID_map[obj.b], obj.fhits.at(x)->finets);
                     }
                     else {
                         if(strip_event.lastChannel<32){
                             xEvents.push_back(strip_event);
                             strip_event.ResetEvent();
                             strip_event.UpdateEvent(obj.fhits.at(x)->ts, x, obj.fhits.at(x)->clong,
-                                                    board_dssd_map[obj.b], board_ID_map[obj.b]);
+                                                    board_dssd_map[obj.b], board_ID_map[obj.b], obj.fhits.at(x)->finets);
                         }
                         else {
                             yEvents.push_back(strip_event);
                             strip_event.ResetEvent();
                             strip_event.UpdateEvent(obj.fhits.at(x)->ts, x, obj.fhits.at(x)->clong,
-                                                    board_dssd_map[obj.b], board_ID_map[obj.b]);
+                                                    board_dssd_map[obj.b], board_ID_map[obj.b],obj.fhits.at(x)->finets);
                         }
                     }
                 }
+            }
             }
         }
         if(strip_event.lastChannel<32 && strip_event.lastChannel > -1){
@@ -462,11 +491,11 @@ public:
             yEvents.push_back(strip_event);
         }
 
-
         //Match front and back events
         for(auto & xEvent : xEvents){
             for(auto & yEvent : yEvents){
-                if(abs(xEvent.energy - yEvent.energy)<500){
+
+                if(abs(xEvent.energy - yEvent.energy)<match){
                     //Paired event
                     AidaTreeData aidaEvent(xEvent, yEvent, nx,ny);
                     aida_events.emplace(aidaEvent.T, aidaEvent);

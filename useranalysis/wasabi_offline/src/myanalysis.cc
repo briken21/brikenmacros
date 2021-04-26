@@ -1,5 +1,5 @@
 
-/* ************************ DO NOT REMOVE  ****************************** */
+/*mrun ************************ DO NOT REMOVE  ****************************** */
 #include <iostream>
 #include <pmonitor/pmonitor.h>
 #include "myanalysis.h"
@@ -35,7 +35,7 @@
 #define V1740_N_MAX_CH 64
 //! parameters for V1740
 #define NSBL 8
-#define N_MAX_WF_LENGTH 90
+int N_MAX_WF_LENGTH = 90;
 UShort_t trig_pos = N_MAX_WF_LENGTH*30/100;//unit of sample
 UShort_t sampling_interval = 8*16;//unit of ns
 
@@ -51,7 +51,6 @@ NIGIRI * treedata;
 AidaTreeData aida_data;
 multimap<ULong64_t, AidaTreeData> aida_data_map;
 multimap<ULong64_t, AidaTreeData>::iterator aidaIt;
-
 // Histograms for wasabi
 TH1D * channelHitPattern;
 TH2D * channelVsEnergy;
@@ -64,7 +63,7 @@ TH2D * dE0vdESum;
 double dE0 = 0;
 double dESum = 0;
 int detNum;
-
+int runNumInt;
 
 int nevt = 0;
 
@@ -94,14 +93,14 @@ void ProcessEvent(NIGIRI* data_now){
                 dESum += aida_data.E;
             }
             aida_tree->Fill();
-            channelHitPattern->Fill(aida_data.z+520);
-            channelVsEnergy->Fill(aida_data.z+520,aida_data.E);
-            dE0vdESum->Fill(dE0, dESum);
+            //channelHitPattern->Fill(aida_data.z+520);
+            //channelVsEnergy->Fill(aida_data.z+520,aida_data.E);
+            //dE0vdESum->Fill(dE0, dESum);
         }
     }
 
     if (data_now->b >= 0 && data_now->b <= 7) {
-        AIDAFromNIGIRI aidaEventBuilder(*data_now);
+        AIDAFromNIGIRI aidaEventBuilder(*data_now, runNumInt);
         //Hit pattern histograms
         for(auto hit : data_now->fhits){
             if (0 < hit->clong){
@@ -116,11 +115,11 @@ void ProcessEvent(NIGIRI* data_now){
             aida_tree->Fill();
             //Matched event histograms
             if(aida_data.ID == 4){
-                detNum = (int)aida_data.z;
+                detNum = (int)aida_data.z-11;
                 detXYImplant[detNum]->Fill(aida_data.x, aida_data.y);
                 detExEyImplant[detNum]->Fill(aida_data.EX,aida_data.EY);
             } else {
-                detNum = (int)aida_data.z-11.0;
+                detNum = (int)aida_data.z-11;
                 detXYBeta[detNum]->Fill(aida_data.x, aida_data.y);
                 detExEyBeta[detNum]->Fill(aida_data.EX,aida_data.EY);
             }
@@ -298,6 +297,12 @@ void decodeV1740zsp(Packet* p1740zsp){
         int headaddr = k;
         data->DecodeHeaderZsp(&gg[k],p1740zsp->getHitFormat());
         k+=V1740_HDR+V1740_N_MAX_CH;
+        if(data->b==11){
+          N_MAX_WF_LENGTH = 90;
+        }
+        else if( data->b >3 && data->b < 9 && runNumInt >26){
+            N_MAX_WF_LENGTH = 360;
+        }
         //! get number of channels from channel mask
         double min_finets = 99999;
         int ich_min_finets = -1;
@@ -529,7 +534,20 @@ int main (int argc, char* argv[])
         return 0;
     }
     if (argc==3) pfileopen(argv[1]);
-    else plistopen(argv[1]);
+    else{
+        if(std::string(argv[3]) != "NOIMPLANT"){
+        runNumInt = std::atoi(argv[3]);
+        if( runNumInt > 26){
+            N_MAX_WF_LENGTH = 360;
+            trig_pos = 360*30/100;//unit of sample
+            sampling_interval = 16;//unit of ns
+        }
+
+        std::cout << "RunNum: " << runNumInt <<std::endl;
+        }
+        plistopen(argv[1]);
+    
+    }
     phsave(argv[2]);
     prun();
     return 0;
