@@ -29,6 +29,8 @@
 
 #include <iostream>
 #include <fstream>
+#include <sstream>
+
 
 #include <correlation.h>
 #include "TThread.h"
@@ -104,6 +106,8 @@ int IdChannel_Trigger=10;
 int nevt_neutrons=0;
 int NumberEvents=0;
 int MultiplicitySignals=0;
+
+string ConfFileName;
 //------------------------------------------------------------
 
 int nevt = 0;
@@ -175,6 +179,21 @@ void ConfigurationFile_Reader(){
        vThreshold.push_back(Threshold);
      }
    }
+
+   Fd.close();
+   std::string CopyFile ="cp ";
+
+   std::size_t lastindex = ConfFileName.find_last_of(".");
+   std::string SaveConfFile = ConfFileName.substr(0, lastindex);
+   CopyFile +="OfflineConf.csv";
+
+   CopyFile +=" ";
+   CopyFile +=SaveConfFile;
+   CopyFile +="_RunConf.csv";
+   cout << "CopyFile:  " << CopyFile << endl;
+   std::cout<<CopyFile.c_str()<<std::endl;
+   system(CopyFile.c_str());
+
 }
 
 void ProcessEvent(NIGIRI* data_now){
@@ -223,6 +242,7 @@ void DoUpdate(){
 void OpenFile(const char* filename){
 
   file0 = new TFile(filename,"recreate");
+  ConfFileName = filename;
 
   BRIKENTree = new TTree("BRIKENTree","BRIKENTree");
   NeutronsBranch = BRIKENTree->Branch("Neutrons.",&ToNeuFill);
