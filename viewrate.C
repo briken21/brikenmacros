@@ -65,7 +65,8 @@ void viewfifo(void* ptr){
       printf("makefifo: Can't open %s\n", FIFOPATH);
     }
     int bufin=10;
-    Int_t i=0;
+    Int_t time_board[20];
+    for (Int_t i=0;i<20;i++) time_board[i]=0;
     c1=new TCanvas("c1","c1",990,700);
     hrate=new TH1F("hrate","hrate",3600,0,3600);
     hrate->SetFillColor(2);
@@ -80,14 +81,15 @@ void viewfifo(void* ptr){
         }
         int boardn=(int)((bufin&0xFF00000)>>24);
         double raterate = (double)(bufin&0xFFFFFF)/1000.;
+
         //std::cout<<"b="<<boardn<<"rate="<<raterate<<std::endl;
 //        c1->cd(0);
-        hrate->Fill(i,10);
-        i++;
+        if (boardn==0) hrate->Fill(time_board[boardn],raterate);
+	time_board[boardn]++;        
     }
 }
 
-void viewfifos()
+void viewrate()
 {
     refesh_thread_argument* ta = new refesh_thread_argument;
     ta->refreshinterval = 3;

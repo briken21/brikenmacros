@@ -86,11 +86,26 @@ public:
         uint8_t dx = xEvent.lastChannel-xEvent.firstChannel;
         uint8_t dy = yEvent.lastChannel-yEvent.firstChannel;
         Tfast = dx + 0x100 * dy;
-        z = xEvent.DSSD;
+        z = xEvent.DSSD + 11.0;
         nx = nx_in;
         ny = ny_in;
         nz = 1;
         ID = xEvent.ID;
+
+    };
+    AidaTreeData(double det, double Energy, ULong64_t ts){
+        T = ts;
+        Tfast = 0;
+        E = Energy;
+        EX = Energy;
+        EY = Energy;
+        x = 0.;
+        y = 0.;
+        z = det;
+        nx = 0;
+        ny = 0;
+        nz = 0;
+        ID = 4;
 
     };
 
@@ -276,7 +291,7 @@ public:
 
         ts = 0;
         evt = 0;
-        b = -9;
+        b = -1;
         fmult = 0;
         for (size_t idx=0;idx<fhits.size();idx++){
             delete fhits[idx];
@@ -396,11 +411,15 @@ public:
         yEvents.clear();
         int nx = 0;
         int ny=0;
+        double threshold = 0;
+        if ( board_ID_map[obj.b] == 4 ){
+            threshold = 2700.0;
+        }
         WasabiStripData strip_event;
         //Get x and y strip events
         //Always 64 events in the vector
         for(auto x = 0; x < obj.fhits.size(); x++){
-            if(obj.fhits.at(x)->clong > 0) {
+            if(obj.fhits.at(x)->clong > threshold) {
                 if (obj.fhits.at(x)->ch < 32) {
                     nx++;
                     if(obj.fhits.at(x)->ch - strip_event.lastChannel == 1 || strip_event.lastChannel == -1) {
@@ -447,11 +466,11 @@ public:
         //Match front and back events
         for(auto & xEvent : xEvents){
             for(auto & yEvent : yEvents){
-                if(abs(xEvent.energy - yEvent.energy)<500){
+                //if(abs(xEvent.energy - yEvent.energy)<500){
                     //Paired event
                     AidaTreeData aidaEvent(xEvent, yEvent, nx,ny);
                     aida_events.emplace(aidaEvent.T, aidaEvent);
-                }
+                //}
             }
         }
     };
@@ -470,6 +489,27 @@ public:
 
 };
 
+class dEFromNIGIRI{
+public:
+    dEFromNIGIRI(NIGIRI & obj){
+        aida_events.clear();
+        for(auto hit : obj.fhits){
+            if (hit->clong > 0){
+                AidaTreeData aidaEvent(detectorMap[hit->ch-33], hit->clong, hit->ts);
+                aida_events.emplace(aidaEvent.T, aidaEvent);
+            }
+        }
+        for (auto eventIt : aida_events){
+            eventIt.second.nz = aida_events.size();
+        }
+
+    };
+    multimap<ULong64_t ,AidaTreeData> GetdEEvents() const{
+        return aida_events;
+    }
+    multimap<ULong64_t ,AidaTreeData> aida_events;
+    double detectorMap[10]= {1.,2.,3.,4.,5.,6.,7.,8.,9.,0.};
+};
 
 #endif
 

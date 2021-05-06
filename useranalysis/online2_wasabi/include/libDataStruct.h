@@ -150,8 +150,9 @@ public:
 //            clong  = 0;
 //        }
         //! only  pulse above threshold give energy>0
-        if (finets>=0) clong  = clong  - baseline;
-        else clong  = -9999;//no data above threshold
+        clong  = clong  - baseline;
+        //if (finets>=0) clong  = clong  - baseline;
+        //else clong  = -9999;//no data above threshold
     };
     /// \cond CLASSIMP
     ClassDef(NIGIRIHit,1);

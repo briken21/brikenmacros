@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE QtCreatorProject>
-<!-- Written by QtCreator 4.12.2, 2021-04-21T19:05:10. -->
+<!-- Written by QtCreator 4.12.2, 2021-04-26T12:48:59. -->
 <qtcreator>
  <data>
   <variable>EnvironmentId</variable>
@@ -342,7 +342,7 @@
     <value type="bool" key="RunConfiguration.UseQmlDebugger">false</value>
     <value type="bool" key="RunConfiguration.UseQmlDebuggerAuto">true</value>
     <value type="QString" key="RunConfiguration.WorkingDirectory"></value>
-    <value type="QString" key="RunConfiguration.WorkingDirectory.default">/tmp/QtCreator-DkoXWY/qtc-cmake-kQrxZtMO</value>
+    <value type="QString" key="RunConfiguration.WorkingDirectory.default">/home/daq/Public/phong/ddaq-dev/ddaq/ddaq_earth_useranalysis/build-online_briken21_v1740zsp-Desktop_Qt_5_12_9_GCC_64bit-Debug</value>
    </valuemap>
    <value type="int" key="ProjectExplorer.Target.RunConfigurationCount">1</value>
   </valuemap>

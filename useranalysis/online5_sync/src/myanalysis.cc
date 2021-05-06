@@ -49,6 +49,10 @@ NIGIRI* data;
 
 int nevtt = 0;
 
+
+int nevtb4 = 0;
+int nevtb11 = 0;
+
 //Correlation map
 #define MAX_MAP_LENGTH 500
 #define MAX_N_CORR_MAPS 13
@@ -86,18 +90,23 @@ void Init(){
     tcorroffsets[12]=-6000;
 
     c1=new TCanvas("c1","c1",900,700);
-
+    c1->Divide(4,3);
     nlupo = 0;
     for (Int_t i=0;i<MAX_N_CORR_MAPS;i++){
         ncorr[i] = 0;
         hlupodgtz[i] = new TH1F(Form("hlupodgtz%d",i),Form("hlupodgtz%d",i),2000,-20000,20000);
+        c1->cd(i+1);
+        hlupodgtz[i]->Draw();
     }
     hlupodgtz_single = new TH1F("hcorr","hcorr",2000,-20000,20000);
-    hlupodgtz_single->Draw();
+    //hlupodgtz_single->Draw();
     pupdate(c1,2);
 }
 
 void ProcessEvent(NIGIRI* data_now){
+    if (data_now->b==4) nevtb4 ++;
+    if (data_now->b==11) nevtb11 ++;
+
     if (datamap_lupo.size()>MAX_MAP_LENGTH){
         for (it_datamap_lupo=datamap_lupo.begin();it_datamap_lupo!=datamap_lupo.end();it_datamap_lupo++){
             Long64_t ts=(Long64_t)it_datamap_lupo->first;
@@ -128,15 +137,17 @@ void ProcessEvent(NIGIRI* data_now){
     }else{
         if (data_now->b<MAX_N_CORR_MAPS-1){
             if (bmap[data_now->b]>=0){
-                //if (data_now->b==9) cout<<data_now->b<<"-"<<data_now->ts<<endl;
+            //if (data_now->b==10) cout<<data_now->b<<"-"<<data_now->ts<<endl;
                 if (data_now->ts<ts_prev[data_now->b])
                     cout<<"TS reset on board" <<data_now->b<<", tsnow = "<<data_now->ts<<" tsprev="<<ts_prev[data_now->b]<<endl;
                 ts_prev[data_now->b]=data_now->ts;
                 datamap_dgtz[bmap[data_now->b]].insert(make_pair(data_now->ts,data_now->b));
             }
         }else if (data_now->b==12){//V1730
-            if (data_now->GetHit(0)->ch==15)
+            //cout<<data_now->b<<"-"<<data_now->ts<<endl;
+            if (data_now->GetHit(0)->ch==15){
                 datamap_dgtz[bmap[data_now->b]].insert(make_pair(data_now->ts,data_now->b));
+            }
         }
 
 //        else{
@@ -164,8 +175,9 @@ void CloseMe(){
     }
     for (Int_t i=0;i<MAX_N_CORR_MAPS;i++){
         ncorr[i] = 0;
-        hlupodgtz[i]->Reset();
+        //hlupodgtz[i]->Reset();
     }
+    cout<<nevtb4<<"\t"<<nevtb11<<endl;
     cout<<"Clear histograms!"<<endl;
 }
 

@@ -179,15 +179,16 @@ void ProcessEvent(NIGIRI* data_now){
         for (Int_t i=0;i<V1740_N_MAX_CH;i++){
             NIGIRIHit* hit=data_now->GetHit(i);
             Int_t ch = hit->ch+(data_now->b-8)*V1740_N_MAX_CH;
-            Int_t itcnt= 0 ;
-            for (std::vector<UShort_t>::iterator it =hit->pulse.begin() ; it != hit->pulse.end(); ++it){
-                hwf2d[ch]->Fill(itcnt,*it);
-                itcnt++;
-            }
+//            Int_t itcnt= 0 ;
+//            for (std::vector<UShort_t>::iterator it =hit->pulse.begin() ; it != hit->pulse.end(); ++it){
+//                hwf2d[ch]->Fill(itcnt,*it);
+//                itcnt++;
+//            }
+            he2d->Fill(ch,hit->clong);
+            he2dpeak->Fill(ch,hit->clong+hit->baseline);
+
             if (hit->clong>200&&hit->clong<1600){
                 if (hit->clong>100) hrateupdate->Fill(ch);
-                he2d->Fill(ch,hit->clong);
-                he2dpeak->Fill(ch,hit->clong+hit->baseline);
 
                 //! hit distribution
                 Int_t ID = id_map[data_now->b][i];
@@ -206,36 +207,33 @@ void ProcessEvent(NIGIRI* data_now){
                     fposZ = rr.Rndm()*fHe3Id2length[ID]+fposZ-fHe3Id2length[ID]/2;
                     if (hit->clong>100) h2d_brikenhit->Fill(x,y,TMath::Pi()*r*r);
                 }
-                if (datamap_hit1.size()>3000){
-                    for (it_datamap_hit1=datamap_hit1.begin();it_datamap_hit1!=datamap_hit1.end();it_datamap_hit1++){
-                        Long64_t ts=(Long64_t)it_datamap_hit1->first;
-                        Int_t b=(Int_t)it_datamap_hit1->second;
-                        Long64_t corrts = 0;
-                        Int_t corrb = 0;
-                        Long64_t ts1 = ts - 200000;
-                        ULong64_t ts2 = ts + 200000;
-                        it_datamap_hit2 = datamap_hit2.lower_bound(ts1);
-                        while(it_datamap_hit2!=datamap_hit2.end()&&it_datamap_hit2->first<ts2){
-                            corrts = (Long64_t) it_datamap_hit2->first;
-                            corrb=(Int_t)it_datamap_hit2->second;
-                            if (corrts!=ts) {
-                                hcorr->Fill(corrts-ts);
-                                if (corrb!=b) hcorrb->Fill(corrts-ts);
-                                else hcorrch->Fill(corrts-ts);
-                            }
-                            //break;
-                            it_datamap_hit2++;
-                        }
-                    }
-                    //cout<<"Clear"<<endl;
-                    datamap_hit1.clear();
-                    datamap_hit2.clear();
-                }
-                datamap_hit1.insert(make_pair(hit->ts,data_now->b));
-                datamap_hit2.insert(make_pair(hit->ts,data_now->b));
-
-
-
+//                if (datamap_hit1.size()>3000){
+//                    for (it_datamap_hit1=datamap_hit1.begin();it_datamap_hit1!=datamap_hit1.end();it_datamap_hit1++){
+//                        Long64_t ts=(Long64_t)it_datamap_hit1->first;
+//                        Int_t b=(Int_t)it_datamap_hit1->second;
+//                        Long64_t corrts = 0;
+//                        Int_t corrb = 0;
+//                        Long64_t ts1 = ts - 200000;
+//                        ULong64_t ts2 = ts + 200000;
+//                        it_datamap_hit2 = datamap_hit2.lower_bound(ts1);
+//                        while(it_datamap_hit2!=datamap_hit2.end()&&it_datamap_hit2->first<ts2){
+//                            corrts = (Long64_t) it_datamap_hit2->first;
+//                            corrb=(Int_t)it_datamap_hit2->second;
+//                            if (corrts!=ts) {
+//                                hcorr->Fill(corrts-ts);
+//                                if (corrb!=b) hcorrb->Fill(corrts-ts);
+//                                else hcorrch->Fill(corrts-ts);
+//                            }
+//                            //break;
+//                            it_datamap_hit2++;
+//                        }
+//                    }
+//                    //cout<<"Clear"<<endl;
+//                    datamap_hit1.clear();
+//                    datamap_hit2.clear();
+//                }
+//                datamap_hit1.insert(make_pair(hit->ts,data_now->b));
+//                datamap_hit2.insert(make_pair(hit->ts,data_now->b));
 
             }//if hit->clong>0;
         }
@@ -334,7 +332,7 @@ int pinit()
   for (Int_t i=0;i<MAX_N_BOARD;i++){
       data_prev[i]=new NIGIRI;
       for (Int_t j=0;j<V1740_N_MAX_CH;j++){
-          ledthr[i][j]=850;
+          ledthr[i][j]=750;
       }
   }
 

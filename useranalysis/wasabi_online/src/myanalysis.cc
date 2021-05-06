@@ -37,7 +37,7 @@
 #define NSBL 8
 #define N_MAX_WF_LENGTH 90
 UShort_t trig_pos = N_MAX_WF_LENGTH*30/100;//unit of sample
-UShort_t sampling_interval = 16*16;//unit of ns
+UShort_t sampling_interval = 16*8;//unit of ns
 
 TFile* file0 = 0;
 TTree* tree = 0;
@@ -52,56 +52,134 @@ AidaTreeData aida_data;
 multimap<ULong64_t, AidaTreeData> aida_data_map;
 multimap<ULong64_t, AidaTreeData>::iterator aidaIt;
 
+// Histograms for wasabi
+TH1D * channelHitPattern;
+TH2D * channelVsEnergy;
+TH2D * detXYBeta[4];
+TH2D * detXYImplant[4];
+TH2D * detExEyBeta[4];
+TH2D * detExEyImplant[4];
 
-TH2F* hxy[4];
-TH2F* hexey[4];
+TH2D * dE0vdESum;
+double dE0 = 0;
+double dESum = 0;
+int detNum;
+
+
 int nevt = 0;
 
-TCanvas* c1;
-TCanvas* c2;
 void Init(){
     treedata = new NIGIRI;
-    for (Int_t i=0;i<64*3;i++){
-        hwf2d[i]=new TH2F(Form("hwf2d%d",i),Form("hwf2d%d",i),300,0,300,500,0,4000);
+    for (Int_t i=0;i<64*10;i++){
+        hwf2d[i]=new TH2F(Form("hwf2d%d",i),Form("hwf2d%d",i),300,0,300,500,0,5000);
     }
-    c1= new TCanvas ("c1","c1",900,700);
-    c1->Divide(2,2);
-    c2= new TCanvas ("c2","c2",900,700);
-    c2->Divide(2,2);
-    he2d = new TH2F("he2d","he2d",64*3,0,64*3,500,0,4000);
-    for (Int_t i=0;i<4;i++){
-        hxy[i]=new TH2F(Form("hxy%d",i),Form("hxy%d",i),32,0,32,32,0,32);
-        hexey[i]=new TH2F(Form("hexey%d",i),Form("hexey%d",i),500,0,4000,500,0,4000);
-        c1->cd(i+1);
-        hxy[i]->Draw("colz");
-        c2->cd(i+1);
-        hexey[i]->Draw("colz");
+    he2d = new TH2F("he2d","he2d",64*10,0,64*10,4000,0,4000);
+
+    //Define histograms
+    channelHitPattern = new TH1D("ChannelHitPattern","",551,0,551);
+    channelVsEnergy = new TH2D("ChannelVsEnergy","",551,0,551,500,0,5000);
+    dE0vdESum = new TH2D("dE0VsdESum","",500,0,5e3,500,0,5e3);
+
+    std::string hName;
+    for(int i = 0; i < 4; i++){
+        hName = "DSSD" + std::to_string(i) + "XYBeta";
+        detXYBeta[i] = new TH2D(hName.c_str(),"",32,0,32,32,0,32);
+        hName = "DSSD" + std::to_string(i) + "XYImplant";
+        detXYImplant[i] = new TH2D(hName.c_str(),"",32,0,32,32,0,32);
+        hName = "DSSD" + std::to_string(i) + "EXEYBeta";
+        detExEyBeta[i] = new TH2D(hName.c_str(),"",500,0,5000,500,0,5000);
+        hName = "DSSD" + std::to_string(i) + "EXEYImplant";
+        detExEyImplant[i] = new TH2D(hName.c_str(),"",500,0,5000,500,0,5000);
     }
-    pupdate(c1,2);
-    pupdate(c2,2);
 }
 
 void ProcessEvent(NIGIRI* data_now){
-    //treedata->Clear();
-    //data_now->Copy(*treedata);
+//    treedata->Clear();
+//    data_now->Copy(*treedata);
 //    tree->Fill();
 
-    if (data_now->b >= 0 && data_now->b <= 7) {
-        AIDAFromNIGIRI aidaEventBuilder(*data_now);
-        aida_data_map = aidaEventBuilder.GetAIDAEvents();
-        for (aidaIt = aida_data_map.begin(); aidaIt != aida_data_map.end(); aidaIt++) {
-            aida_data = aidaIt->second;
-            Int_t z=(Int_t)aida_data.z;
-            hxy[z]->Fill(aida_data.x,aida_data.y);
-            hexey[z]->Fill(aida_data.EX,aida_data.EY);
+    if (data_now->b == 11) {
+        // check raw waveform only dE
+        for (Int_t i=0;i<V1740_N_MAX_CH;i++){
+            NIGIRIHit* hit=data_now->GetHit(i);
+            Int_t ch = i + 4*V1740_N_MAX_CH;
+            Int_t itcnt= 0 ;
+            for (std::vector<UShort_t>::iterator it =hit->pulse.begin() ; it != hit->pulse.end(); ++it){
+                //if (itcnt<N_MAX_WF_LENGTH){
+                    hwf2d[ch]->Fill(itcnt,*it);
+                //}
+                itcnt++;
+            }
+            //if (hit->clong>0){
+	      //he2d->Fill(ch,hit->clong);
+		//}
+        }
+
+        //dE detector event
+        dEFromNIGIRI dEEventBuilder(*data_now);
+        aida_data_map = dEEventBuilder.GetdEEvents();
+        dESum = 0;
+        for( auto dEIt : aida_data_map){
+            aida_data = dEIt.second;
+            if (aida_data.z == 0){
+                dE0 = aida_data.E;
+            } else{
+                dESum += aida_data.E;
+            }
             //aida_tree->Fill();
+            channelHitPattern->Fill(aida_data.z+520);
+            channelVsEnergy->Fill(aida_data.z+520,aida_data.E);
+            dE0vdESum->Fill(dE0, dESum);
         }
     }
 
+    if (data_now->b >= 0 && data_now->b <= 7) {
+        // check raw waveform only low gain
+        //if (data_now->b<4){
+            for (Int_t i=0;i<V1740_N_MAX_CH;i++){
+                NIGIRIHit* hit=data_now->GetHit(i);
+                Int_t ch = i + (data_now->b)*V1740_N_MAX_CH;
+                Int_t itcnt= 0 ;
+                for (std::vector<UShort_t>::iterator it =hit->pulse.begin() ; it != hit->pulse.end(); ++it){
+                    //if (itcnt<N_MAX_WF_LENGTH){
+                        hwf2d[ch]->Fill(itcnt,*it);
+                    //}
+                    itcnt++;
+                }
+                if (hit->clong>0){
+                    he2d->Fill(ch,hit->clong);
+                }
+            }
+        //}
+        AIDAFromNIGIRI aidaEventBuilder(*data_now);
+        //Hit pattern histograms
+        for(auto hit : data_now->fhits){
+            if (0 < hit->clong){
+                channelHitPattern->Fill(data_now->b*64+hit->ch);
+                channelVsEnergy->Fill(data_now->b*64+hit->ch, hit->clong);
+            }
+        }
+
+        aida_data_map = aidaEventBuilder.GetAIDAEvents();
+        for (aidaIt = aida_data_map.begin(); aidaIt != aida_data_map.end(); aidaIt++) {
+            aida_data = aidaIt->second;
+            //aida_tree->Fill();
+            //Matched event histograms
+            if(aida_data.ID == 4){
+                detNum = (int)aida_data.z-11;
+                detXYImplant[detNum]->Fill(aida_data.x, aida_data.y);
+                detExEyImplant[detNum]->Fill(aida_data.EX,aida_data.EY);
+            } else {
+                detNum = (int)aida_data.z-11;
+                detXYBeta[detNum]->Fill(aida_data.x, aida_data.y);
+                detExEyBeta[detNum]->Fill(aida_data.EX,aida_data.EY);
+            }
+        }
+    }
 }
 
 void DoUpdate(){
-    pstatus();
+    //pstatus();
 }
 
 void OpenFile(const char* filename){
@@ -110,12 +188,39 @@ void OpenFile(const char* filename){
     tree->Branch("data",&treedata);
     aida_tree = new TTree("AIDA_hits","AIDA_hits");
     aida_tree->Branch("aida_hit", &aida_data,"T/l:Tfast/l:E/D:Ex/D:Ey/D:x/D:y/D:z/D:nx/I:ny/I:nz/I:ID/b");
+//    //Define histograms
+//    channelHitPattern = new TH1D("ChannelHitPattern","",527,0,527);
+//    channelVsEnergy = new TH2D("ChannelVsEnergy","",527,0,527,500,0,5000);
+//    dE0vdESum = new TH2D("dE0VsdESum","",500,0,5e3,500,0,5e3);
+
+//    std::string hName;
+//    for(int i = 0; i < 4; i++){
+//        hName = "DSSD" + std::to_string(i) + "XYBeta";
+//        detXYBeta[i] = new TH2D(hName.c_str(),"",32,0,32,32,0,32);
+//        hName = "DSSD" + std::to_string(i) + "XYImplant";
+//        detXYImplant[i] = new TH2D(hName.c_str(),"",32,0,32,32,0,32);
+//        hName = "DSSD" + std::to_string(i) + "EXEYBeta";
+//        detExEyBeta[i] = new TH2D(hName.c_str(),"",500,0,5000,500,0,5000);
+//        hName = "DSSD" + std::to_string(i) + "EXEYImplant";
+//        detExEyImplant[i] = new TH2D(hName.c_str(),"",500,0,5000,500,0,5000);
+//    }
 }
 
 void CloseMe(){
     if (file0) {
         if (tree) tree->Write();
         if (aida_tree) aida_tree->Write();
+
+        channelHitPattern->Write();
+        channelVsEnergy->Write();
+        dE0vdESum->Write();
+        for (int i = 0 ;i <4; i++) {
+            detXYBeta[i]->Write();
+            detXYImplant[i]->Write();
+            detExEyBeta[i]->Write();
+            detExEyImplant[i]->Write();
+        }
+
         file0->Close();
     }
     cout<<nevt<<endl;
@@ -137,14 +242,18 @@ typedef enum{
     V1730DPPPHA = 4,
 }pmap_decode;
 
-//#define N_PACKETMAP 14
-//const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,61,100};
-//const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA};
-//! current map
+//! full map
+//const int packetmap[]={50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
+//const pmap_decode packetdecode[]={V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
+
+//! current map Used for the Bi data
+//const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,100,101,102,103};
+//const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA,V1730DPPPHA};
+
+//Map from 210419 elog
 #define N_PACKETMAP 14
 const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,61,100};
-const pmap_decode packetdecode[]={NONE,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,NONE,NONE,NONE,NONE,NONE};
-
+const pmap_decode packetdecode[]={LUPO,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1740ZSP,V1730DPPPHA};
 UShort_t ledthr[MAX_N_BOARD][V1740_N_MAX_CH];
 NIGIRI* data_prev[MAX_N_BOARD];
 
@@ -189,7 +298,10 @@ int pinit()
   for (Int_t i=0;i<MAX_N_BOARD;i++){
       data_prev[i]=0;
       for (Int_t j=0;j<V1740_N_MAX_CH;j++){
-          ledthr[i][j]=1550;
+          ledthr[i][j]=1600;
+          if (i==11){
+              ledthr[i][j]=750;
+          }
       }
   }
 

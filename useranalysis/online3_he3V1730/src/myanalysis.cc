@@ -61,6 +61,7 @@ TH1F *hap2trace1d[V1730_MAX_N_CH*MAX_N_V1730_BOARD];
 TH1F *hdptrace1d[V1730_MAX_N_CH*MAX_N_V1730_BOARD];
 TH1F *htrgtrace1d[V1730_MAX_N_CH*MAX_N_V1730_BOARD];
 
+TH2F *he2d_He3;
 
 std::multimap <ULong64_t,UChar_t> datamap_hit1; //! sort by timestamp
 std::multimap <ULong64_t,UChar_t> datamap_hit2; //! sort by timestamp
@@ -69,8 +70,6 @@ std::multimap<ULong64_t,UChar_t>::iterator it_datamap_hit2;
 
 
 TH1F *hcorr;
-TH1F *hcorrb;
-TH1F *hcorrch;
 
 int nevt = 0;
 
@@ -87,20 +86,70 @@ void Init(){
         he1d[ch]=new TH1F(Form("he1d%d",ch),Form("he1d%d",ch),20000,0,20000);
     }
     c1=new TCanvas("c1","c1",900,700);
+    he2d_He3 = new TH2F("he2d_He3","he2d_He3",64*3,0,64*3,2000,0,4000);
     he2d = new TH2F("he2d","he2d",V1730_MAX_N_CH*MAX_N_V1730_BOARD,0,V1730_MAX_N_CH*MAX_N_V1730_BOARD,5000,0,20000);
     he2d->Draw("colz");
 
-//    hcorr=new TH1F("hcorr","hcorr",5000,-200000,200000);
-//    hcorrch=new TH1F("hcorrch","hcorrch",5000,-200000,200000);
-//    hcorrb=new TH1F("hcorrb","hcorrb",5000,-200000,200000);
+    hcorr=new TH1F("hcorr","hcorr",5000,-200000,200000);
     pupdate(c1,2);
 }
 
 void ProcessEvent(NIGIRI* data_now){
+    if (datamap_hit1.size()>5000){
+        Int_t icnt=0;
+        for (it_datamap_hit1=datamap_hit1.begin();it_datamap_hit1!=datamap_hit1.end();it_datamap_hit1++){
+            Long64_t ts=(Long64_t)it_datamap_hit1->first;
+            //if (icnt<10) cout<<ts<<endl;
+            Int_t b=(Int_t)it_datamap_hit1->second;
+            Long64_t corrts = 0;
+            Int_t corrb = 0;
+            Long64_t ts1 = ts - 200000;
+            ULong64_t ts2 = ts + 200000;
+            it_datamap_hit2 = datamap_hit2.lower_bound(ts1);
+            while(it_datamap_hit2!=datamap_hit2.end()&&it_datamap_hit2->first<ts2){
+                corrts = (Long64_t) it_datamap_hit2->first;
+                corrb=(Int_t)it_datamap_hit2->second;
+                if (corrts!=ts) {
+                    hcorr->Fill(corrts-ts);
+                }
+                //break;
+                it_datamap_hit2++;
+            }
+            icnt++;
+        }
+        //cout<<datamap_hit1.size()<<" - "<<datamap_hit2.size()<<endl;
+
+
+        datamap_hit1.clear();
+        datamap_hit2.clear();
+    }
+    //! He3
+    if (data_now->b==8||data_now->b==9||data_now->b==10){
+        for (Int_t i=0;i<V1740_N_MAX_CH;i++){
+            NIGIRIHit* hit=data_now->GetHit(i);
+            Int_t ch = hit->ch+(data_now->b-8)*V1740_N_MAX_CH;
+            if (hit->clong>200&&hit->clong<1600){
+                he2d_He3->Fill(ch,hit->clong);
+                datamap_hit2.insert(make_pair(hit->ts,data_now->b));
+            }
+        }
+    }
+
+
+
+//    if (data_now->b==10){
+//        data_now->Print();
+//    }
+    //! Clover
     if (data_now->b==12){
         //data_now->Print();
         NIGIRIHit* hit = data_now->GetHit(0);
         Int_t ch = V1730_MAX_N_CH*(data_now->b-12) + hit->ch;
+
+        if (hit->clong>100) {
+            he1d[ch]->Fill(hit->clong);
+            datamap_hit1.insert(make_pair(data_now->ts,data_now->b));
+        }
         if (hit->clong>100) he1d[ch]->Fill(hit->clong);
         he2d->Fill(ch,hit->clong);
 //        hap1trace1d[ch]->Reset();
@@ -180,7 +229,7 @@ typedef enum{
 
 #define N_PACKETMAP 14
 const int packetmap[]={49,50,51,52,53,54,55,56,57,58,59,60,61,100};
-const pmap_decode packetdecode[]={NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,V1730DPPPHA};
+const pmap_decode packetdecode[]={NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,NONE,V1740ZSP,V1740ZSP,V1740ZSP,NONE,V1730DPPPHA};
 
 UShort_t ledthr[MAX_N_BOARD][V1740_N_MAX_CH];
 NIGIRI* data_prev[MAX_N_BOARD];
@@ -226,7 +275,7 @@ int pinit()
   for (Int_t i=0;i<MAX_N_BOARD;i++){
       data_prev[i]=new NIGIRI;
       for (Int_t j=0;j<V1740_N_MAX_CH;j++){
-          ledthr[i][j]=1550;
+          ledthr[i][j]=750;
       }
   }
 
@@ -284,7 +333,10 @@ void decodeV1740zsp(Packet* p1740zsp){
             NIGIRIHit* chdata=new NIGIRIHit;
             chdata->ch = i;//for sorter
             int nsample = gg[headaddr+V1740_HDR+i];
+
+
             if (nsample>NSBL&&nsample<N_MAX_WF_LENGTH){
+                //cout<<i<<"bbb"<<nsample<<endl;
                 data->board_fail_flag = 1;
             }
             chdata->nsample = nsample;
@@ -317,21 +369,21 @@ void decodeV1740zsp(Packet* p1740zsp){
         }//loop all channels
         data->trig_ch = ich_min_finets;
 
-
         if (data->board_fail_flag==1){
-            data_prev[data->b]->MergePulse(data,data_prev[data->b]->ts,NSBL,ledthr[data->b],trig_pos,sampling_interval);
+            data_prev[data->b]->MergePulse(data,data_prev[data->b]->ts,NSBL,ledthr[data->b],trig_pos,sampling_interval,N_MAX_WF_LENGTH);
         }
         //ProcessEvent(data);
         //! process data
-        if (data_prev[data->b]->b!=-9){
+        if (data_prev[data->b]->b>=0){
             if (data_prev[data->b]->board_fail_flag!=1)
                 ProcessEvent(data_prev[data->b]);
+            data_prev[data->b]->Clear();
         }
-        data_prev[data->b]->Clear();
         data->Copy(*data_prev[data->b]);
         //data_prev[data->b] = (NIGIRI*) data->Clone();
     }
 }
+
 
 void decodeV1730dpppha(Packet* p1730dpppha){
     //!**************************************************
