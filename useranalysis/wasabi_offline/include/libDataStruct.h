@@ -58,7 +58,7 @@ public:
             finets = finets_in;
         }
         if(ID == 4){
-        energy = 2700;
+        energy = Energy_in;
         }
        
     };
@@ -95,6 +95,7 @@ public:
         E = (xEvent.energy + yEvent.energy)/2.0;
         EX = xEvent.energy;
         EY = yEvent.energy;
+        z = xEvent.DSSD + 11.0;
         if(xEvent.ID == 5){
         x = (xEvent.lastChannel+xEvent.firstChannel)/2.0;
         y = ((yEvent.lastChannel+yEvent.firstChannel)/2.0)-32.0;
@@ -106,8 +107,11 @@ public:
         x = xEvent.min_time_strip;
         y = yEvent.min_time_strip-32.0;
         Tfast = 0;
+        if(z>10){
+          EX = xEvent.finets;
+          EY = yEvent.finets;
         }
-        z = xEvent.DSSD + 11.0;
+        }
         nx = nx_in;
         ny = ny_in;
         nz = 1;
@@ -436,10 +440,10 @@ public:
         double match = 600;
         int finetsCut = 31;
         if ( runNum > 26){
-          finetsCut = 75;
+          finetsCut = 90;
         }
         if ( board_ID_map[obj.b] == 4 ){
-            threshold = 2700.0;
+            threshold = 2400.0;
             match = 20e3;
         }
         WasabiStripData strip_event;
@@ -523,8 +527,8 @@ public:
     dEFromNIGIRI(NIGIRI & obj){
         aida_events.clear();
         for(auto hit : obj.fhits){
-            if (hit->clong > 0 && hit->ch >0 && hit->ch < 11){
-                AidaTreeData aidaEvent(detectorMap[hit->ch], hit->clong, hit->ts);
+            if (hit->clong > 0 && hit->ch >22 && hit->ch < 27){
+                AidaTreeData aidaEvent(detectorMap[abs(hit->ch-23)], hit->clong, hit->ts);
                 aida_events.emplace(aidaEvent.T, aidaEvent);
             }
         }

@@ -114,7 +114,7 @@ void ProcessEvent(NIGIRI* data_now){
             aida_data = aidaIt->second;
             aida_tree->Fill();
             //Matched event histograms
-            if(aida_data.ID == 4){
+            if(aida_data.ID == 4 && aida_data.z>11){
                 detNum = (int)aida_data.z-11;
                 detXYImplant[detNum]->Fill(aida_data.x, aida_data.y);
                 detExEyImplant[detNum]->Fill(aida_data.EX,aida_data.EY);
@@ -297,11 +297,13 @@ void decodeV1740zsp(Packet* p1740zsp){
         int headaddr = k;
         data->DecodeHeaderZsp(&gg[k],p1740zsp->getHitFormat());
         k+=V1740_HDR+V1740_N_MAX_CH;
-        if(data->b==11){
+        if(data->b==11||(data->b==7 && (runNumInt < 164 || runNumInt > 169)) ){
           N_MAX_WF_LENGTH = 90;
+          sampling_interval = 8*16;
         }
         else if( data->b >3 && data->b < 9 && runNumInt >26){
             N_MAX_WF_LENGTH = 360;
+            sampling_interval = 16;
         }
         //! get number of channels from channel mask
         double min_finets = 99999;
@@ -345,7 +347,6 @@ void decodeV1740zsp(Packet* p1740zsp){
             data->AddHit(chdata);
         }//loop all channels
         data->trig_ch = ich_min_finets;
-
         if (data->board_fail_flag==1){
             data_prev[data->b]->MergePulse(data,data_prev[data->b]->ts,NSBL,ledthr[data->b],trig_pos,sampling_interval);
         }

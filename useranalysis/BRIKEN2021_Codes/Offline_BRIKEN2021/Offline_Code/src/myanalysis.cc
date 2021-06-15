@@ -9,6 +9,7 @@
 #include <pmonitor/pmonitor.h>
 #include "myanalysis.h"
 #include <time.h>
+#include <stdlib.h>
 
 #include <libDataStruct.h>
 #include <bitset>
@@ -28,6 +29,8 @@
 
 #include <iostream>
 #include <fstream>
+#include <sstream>
+
 
 #include <correlation.h>
 #include "TThread.h"
@@ -42,7 +45,7 @@
 #define NSBL 8
 #define N_MAX_WF_LENGTH 90
 UShort_t trig_pos = N_MAX_WF_LENGTH*30/100;//unit of sample
-UShort_t sampling_interval = 16*16;//unit of ns
+UShort_t sampling_interval = 16*8;//unit of ns
 
 TFile* file0 = 0;
 TTree* tree = 0;
@@ -87,6 +90,7 @@ std::vector<uint16_t> vIndex1;
 std::vector<uint16_t> vIndex2;
 std::vector<double> vEOffset;
 std::vector<double> vEFactor;
+std::vector<double> vEFactorSecond;
 std::vector<double> vThreshold;
 
 double TimeOLD=0;
@@ -100,9 +104,18 @@ int Count_RepeatTime_Neutron=0;
 int IdChannel_Trigger=10;
 
 int nevt_neutrons=0;
+int NumberEvents=0;
+int MultiplicitySignals=0;
+
+string ConfFileName;
 //------------------------------------------------------------
 
 int nevt = 0;
+
+double CalibrateEnergy(double eraw, double a0, double a1, double a2){
+  double ene = eraw + rand()/double(RAND_MAX)-0.5;
+  return a0+(a1 + a2*ene)*ene;
+}
 
 
 
@@ -120,6 +133,7 @@ void ConfigurationFile_Reader(){
   vIndex2.clear();
   vEOffset.clear();
   vEFactor.clear();
+  vEFactorSecond.clear();
   vThreshold.clear();
 
    string FileName="OfflineConf.csv";
@@ -137,7 +151,7 @@ void ConfigurationFile_Reader(){
      if(line.size()>5){
        std::string Name,Module,Type,Parameter;
        uint16_t Id=0, Crate=0, Channel=0, InputType=0, Index1=0, Index2=0;
-       double EOffset=0, EFactor=0, Threshold=0;
+       double EOffset=0, EFactor=0, EFactorSecond=0, Threshold=0;
        istringstream iss(line,istringstream::in);
        iss>>Name;
        iss>>Id;
@@ -148,6 +162,7 @@ void ConfigurationFile_Reader(){
        iss>>Index2;
        iss>>EOffset;
        iss>>EFactor;
+       iss>>EFactorSecond;
        iss>>Threshold;
 
 
@@ -160,9 +175,25 @@ void ConfigurationFile_Reader(){
        vIndex2.push_back(Index2);
        vEOffset.push_back(EOffset);
        vEFactor.push_back(EFactor);
+       vEFactorSecond.push_back(EFactorSecond);
        vThreshold.push_back(Threshold);
      }
    }
+
+   Fd.close();
+   std::string CopyFile ="cp ";
+
+   std::size_t lastindex = ConfFileName.find_last_of(".");
+   std::string SaveConfFile = ConfFileName.substr(0, lastindex);
+   CopyFile +="OfflineConf.csv";
+
+   CopyFile +=" ";
+   CopyFile +=SaveConfFile;
+   CopyFile +="_RunConf.csv";
+   cout << "CopyFile:  " << CopyFile << endl;
+   std::cout<<CopyFile.c_str()<<std::endl;
+   system(CopyFile.c_str());
+
 }
 
 void ProcessEvent(NIGIRI* data_now){
@@ -174,13 +205,13 @@ void ProcessEvent(NIGIRI* data_now){
 // Function to sort the timestamps, the associated magnitudes and fill the BRIKENTree.
 void ProcessEvent_BRIKENTree_Organized(std::multimap<uint64_t,BrikenTreeData> DataMap){
 
-  ToNeuFill.Clear();
-  ToGammaFill.Clear();
-  ToAncFill.Clear();
-
   cout << "BRIKENTree size:  " << DataMap.size() << endl;
 
   for(auto it=DataMap.begin(); it!=DataMap.end(); it++){
+
+    ToNeuFill.Clear();
+    ToGammaFill.Clear();
+    ToAncFill.Clear();
 
     //if (it->second.T-TimeOLD==0)cout << "Repeated timestamp" << it->second.E << endl;
     if (it->second.T-TimeOLD<0)cout << "Timestamp sort error!!!" << "Number event:  " << nevt << endl;
@@ -211,6 +242,7 @@ void DoUpdate(){
 void OpenFile(const char* filename){
 
   file0 = new TFile(filename,"recreate");
+  ConfFileName = filename;
 
   BRIKENTree = new TTree("BRIKENTree","BRIKENTree");
   NeutronsBranch = BRIKENTree->Branch("Neutrons.",&ToNeuFill);
@@ -226,7 +258,7 @@ void OpenFile(const char* filename){
 // End the program.  Fill the BRIKENTree and store it in a root file. Also print the proportion of counts with repeated time stamp.
 void CloseMe(){
   ProcessEvent_BRIKENTree_Organized(DataMapBRIKEN);
-  cout << "Count_RepeatTime/Total(%):  " << float(Count_RepeatTime)/float(nevt)*100. << endl;
+  cout << "Count_RepeatTime/Total(%):  " << float(Count_RepeatTime)/float(NumberEvents)*100. << endl;
   cout << "Count_RepeatTime_NeutronRegion/Total_NeutronRegion(%):  " << float(Count_RepeatTime_Neutron)/float(nevt_neutrons)*100. << endl;
 
   if (file0) {
@@ -234,7 +266,7 @@ void CloseMe(){
     if (BRIKENTree) BRIKENTree->Write();
     file0->Close();
   }
-  cout<< "Number of events: " << nevt <<endl;
+  cout<< "Number of events: " << NumberEvents <<endl;
   cout<< "Number of events neutron region: " << nevt_neutrons <<endl;
 }
 
@@ -352,6 +384,7 @@ void decodeV1740raw(Packet* p1740raw){
 
 void BRIKENTree_Construction(NIGIRI* treeModule, int BoardNumber){
 
+  MultiplicitySignals=0;
   for (int irn=0; irn<64; irn++){
     if ( treeModule->fhits.at(irn)->clong > 0 ){
 
@@ -372,10 +405,10 @@ void BRIKENTree_Construction(NIGIRI* treeModule, int BoardNumber){
         cout << "Channel missing:  " << irn << endl;
       }
 
-      //cout << " vEFactor[IdChannel_Trigger]:  " << vEFactor[IdChannel_Trigger] << endl;
-
       data_BRIKEN.T = treeModule->fhits.at(irn)->ts;
-      data_BRIKEN.E = treeModule->fhits.at(irn)->clong * vEFactor[IdChannel_Trigger] + vEOffset[IdChannel_Trigger];
+      //if (irn==30 && data_BRIKEN.T!=0)cout << "data_BRIKEN.T:  " << data_BRIKEN.T << endl;
+      data_BRIKEN.E = (treeModule->fhits.at(irn)->clong+ rand()/double(RAND_MAX) - 0.5) * ( treeModule->fhits.at(irn)->clong * vEFactorSecond[IdChannel_Trigger] + vEFactor[IdChannel_Trigger]) + vEOffset[IdChannel_Trigger];
+      //data_BRIKEN.E = CalibrateEnergy(treeModule->fhits.at(irn)->clong,vEOffset[IdChannel_Trigger],vEFactor[IdChannel_Trigger],vEFactorSecond[IdChannel_Trigger])
       data_BRIKEN.Id = IdChannel_Trigger;
       data_BRIKEN.type = vInputType[IdChannel_Trigger];
       data_BRIKEN.Index1 = vIndex1[IdChannel_Trigger];
@@ -384,15 +417,18 @@ void BRIKENTree_Construction(NIGIRI* treeModule, int BoardNumber){
 
 
       DataMapBRIKEN.emplace(data_BRIKEN.T,data_BRIKEN);
-      nevt++;
-      if (data_BRIKEN.E>150 && data_BRIKEN.E<820)nevt_neutrons++;
+      NumberEvents++;
+      if (data_BRIKEN.E>150 && data_BRIKEN.E<820 && data_BRIKEN.type==1)nevt_neutrons++;
 
-      if ( data_BRIKEN.T == Last_Timestamp && (data_BRIKEN.E<900 || Last_Energy<900) ){
+      if ( data_BRIKEN.T != Last_Timestamp )MultiplicitySignals=0;
+      if ( data_BRIKEN.T == Last_Timestamp ){
         Count_RepeatTime++;
+        MultiplicitySignals++;
         if (data_BRIKEN.E>150 && data_BRIKEN.E<820)Count_RepeatTime_Neutron++;
-        data_BRIKEN.T = data_BRIKEN.T + 1;
+        data_BRIKEN.T = data_BRIKEN.T + MultiplicitySignals;
+        //cout << "MultiplicitySignals:  " << MultiplicitySignals << endl;
       }
-      Last_Timestamp = data_BRIKEN.T;
+      Last_Timestamp = data_BRIKEN.T-MultiplicitySignals;
       Last_Energy = data_BRIKEN.E;
     }
   }
@@ -472,6 +508,7 @@ void decodeV1740zsp(Packet* p1740zsp){
         //! process data
         if (data_prev[data->b]->b>=0){
             if (data_prev[data->b]->board_fail_flag!=1)
+            //if (data_prev[data->b]->fhits.at(30)->ts!=0)cout << "data_prev[data->b]->fhits.at(30)->ts:  " << data_prev[data->b]->fhits.at(30)->ts << endl;
                 BRIKENTree_Construction(data_prev[data->b], data->b);
                 //ProcessEvent(data_prev[data->b]);
             data_prev[data->b]->Clear();
@@ -596,7 +633,10 @@ void decodeV1730dpppha(Packet* p1730dpppha){
                   }
 
                   data_BRIKEN.T = data->ts;
-                  data_BRIKEN.E = channeldata.energy * vEFactor[IdChannel_Trigger];
+
+                  //double EnergyRaw = channeldata.energy  - 0.5;
+                  //data_BRIKEN.E = EnergyRaw * ( EnergyRaw * vEFactorSecond[IdChannel_Trigger]+ vEFactor[IdChannel_Trigger] ) + vEOffset[IdChannel_Trigger];
+                  data_BRIKEN.E = CalibrateEnergy(channeldata.energy,vEOffset[IdChannel_Trigger],vEFactor[IdChannel_Trigger],vEFactorSecond[IdChannel_Trigger]);
                   data_BRIKEN.Id = IdChannel_Trigger;
                   data_BRIKEN.type = vInputType[IdChannel_Trigger];
                   data_BRIKEN.Index1 = vIndex1[IdChannel_Trigger];
@@ -604,8 +644,8 @@ void decodeV1730dpppha(Packet* p1730dpppha){
                   data_BRIKEN.Name = vName[IdChannel_Trigger];
 
                   DataMapBRIKEN.emplace(data_BRIKEN.T,data_BRIKEN);
-                  nevt++;
-                  if (data_BRIKEN.E>150 && data_BRIKEN.E<820)nevt_neutrons++;
+                  NumberEvents++;
+                  if (data_BRIKEN.E>150 && data_BRIKEN.E<820 && data_BRIKEN.type==1)nevt_neutrons++;
 
                   if ( data_BRIKEN.T == Last_Timestamp && (data_BRIKEN.E<900 || Last_Energy<900) ){
                     Count_RepeatTime++;
